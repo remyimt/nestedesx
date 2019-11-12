@@ -1,0 +1,3 @@
+* Optimiser la recherche de fichiers sur les datastore : Get-ChildItem -Path $datastore.DatastoreBrowserPath | Where-Object { $_.Name -like $filename }
+* Faire un script qui éteint le cluster
+
