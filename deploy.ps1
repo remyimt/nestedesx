@@ -14,45 +14,16 @@ $vcenterIp = $config.vcenter.ip
 $vcenterUser = $config.vcenter.user
 $vcenterPwd = $config.vcenter.pwd
 # ESXi configuration : IP, root account and password
-$esx = $config.physical_esx
-# Files to upload on datastores
-$fileFolder = "./Files"
-$esxInstallerPattern = "VMware-VMvisor-Installer*.iso"
-# Objects representing the physical ESXi
+$esxConfig = $config.physical_esx
+# List of physical ESX available (ping)
 $pEsx = @()
-# vCenter VM host
-$vcenterHost = $null
-# Objects representing the virtualized ESXi
+$ip2obj = @{ }
+# List of virtualized ESX
 $vEsx = @()
 # ESXi Cluster Name
 $datacenter = "SchoolDatacenter"
 $physicalCluster = "PhysicalESX"
-$virtualCluster = "VirtualESX"
-$vmCluster = "VirtualMachines"
-
-### Function Definitions
-Function uploadFile {
-    param (
-        [Parameter(Mandatory)]
-        [string]
-        $filename, 
-        [Parameter(Mandatory)]
-        [VMware.VimAutomation.ViCore.Types.V1.DatastoreManagement.Datastore]
-        $datastore
-    )
-    Write-Host ("Looking for {0} on datastore {1}" -f $filename, $datastore.Name) -ForegroundColor $DefaultColor
-    $myFile = Get-ChildItem -Path $datastore.DatastoreBrowserPath | Where-Object { $_.Name -like $filename }
-    if ($myFile.Count -eq 0) {
-        Write-Host "Upload the file on" $datastore.Name -ForegroundColor $DefaultColor
-        $copyFile = Copy-DatastoreItem -Item $fileFolder/$filename -Destination $datastore.DatastoreBrowserPath
-    }
-    else {
-        Write-Host ("{0} exists on {1}") -f $filename, $datastore -ForegroundColor $DefaultColor
-        $copyFile = $myFile[0]
-    }
-    $copyFile
-}
-### End of functions
+$vEsxOVF = "./Files/vesx-ovf/vesx-template/vesx-template.ovf"
 
 # Connection to vSphere
 Write-Host "Connecting to vSphere" -ForegroundColor $DefaultColor
@@ -61,13 +32,12 @@ Connect-VIServer -Server $vcenterIp -User $vcenterUser -Password $vcenterPwd
 Write-Host "== Physical ESXi Configuration =="
 # Add ESXi
 Write-Host "Configuring ESXi:" -ForegroundColor $DefaultColor
-$esxReady = @()
-foreach ($e in $esx) {
+foreach ($e in $esxConfig) {
     $oReturn = Test-Connection -computername $e.ip -Count 1 -quiet
     switch ($oReturn) {
         $true {
             Write-Host ("+ Add {0} to the ESXi list" -f $e.ip) -ForegroundColor $DefaultColor
-            $esxReady += $e
+            $pEsx += $e
         }
         $false {
             Write-Host ("- Remove {0} from the ESXi list" -f $e.ip) -ForegroundColor $ErrorColor
@@ -77,8 +47,8 @@ foreach ($e in $esx) {
         }
     }
 }
-Write-Host $esxReady.Count "ESXi available:" -ForegroundColor $DefaultColor
-$esxReady.foreach{
+Write-Host $pEsx.Count "ESXi available:" -ForegroundColor $DefaultColor
+$pEsx.foreach{
     Write-Host $_.ip -ForegroundColor $DefaultColor
 }
 
@@ -94,26 +64,54 @@ Try {
 }
 Catch {
     Write-Host "Create the cluster" -ForegroundColor $DefaultColor
-    $cl = New-Cluster -Name $physicalCluster
-    -Location $dc
+    $cl = New-Cluster -Name $physicalCluster -Location $dc
 }
-foreach ($e in $esxReady) {
+foreach ($e in $pEsx) {
     try {
-        $h = Get-VMHost -Name $e.ip -Location $physicalCluster
+        $ip2obj[$e.ip] = Get-VMHost -Name $e.ip -Location $physicalCluster
     }
     catch {
         Write-Host ("Add the host {0} to $physicalCluster" -f $e.ip) -ForegroundColor $DefaultColor
-        $h = Add-VMHost -Name $e.ip -Location $physicalCluster -User $e.user -Password $e.pwd -Force
-    }
-    $vm = Get-VM -Name "*vCenter-Server-Appliance*"
-    if ($h.Id -eq $vm.VMHostId) {
-        Write-Host ("vCenter on {0}" -f $e.ip) -ForegroundColor $DefaultColor
-        $vcenterHost = $h
-    }
-    else {
-        $pEsx += $h
+        $ip2obj[$e.ip] = Add-VMHost -Name $e.ip -Location $physicalCluster -User $e.user -Password $e.pwd -Force
     }
 }
+Write-Host "== Virtualized ESXi Configuration ==" -ForegroundColor $DefaultColor
+# Create VM from OVF
+$nbNewEsx = 1
+foreach ($e in $pEsx) {
+    for ($i = 0; $i -lt $e.nb_vesx; $i++) {
+        # Create one vESXi
+        $NewEsxName = "vesx" + $nbNewEsx
+        try {
+            $newEsx = Get-VM -Name $NewEsxName
+        }
+        catch {
+            Write-Host ("Creating the virtualized ESXi " + $NewEsxName) -ForegroundColor $DefaultColor
+            $newEsx = Import-vApp -Source $vEsxOVF -VMHost $ip2obj[$e.ip] -Name $NewEsxName -DiskStorageFormat Thin
+            if ($nbNewEsx -lt 10) {
+                $trash = $newEsx | Get-NetworkAdapter | Set-NetworkAdapter -MacAddress ("00:50:56:a1:00:0" + $nbNewEsx) -Confirm:$false -StartConnected:$true
+            }
+            else {
+                $trash = $newEsx | Get-NetworkAdapter | Set-NetworkAdapter -MacAddress ("00:50:56:a1:00:" + $nbNewEsx) -Confirm:$false -StartConnected:$true
+            }
+        }
+        if ($newEsx.PowerState -eq "PoweredOff") {
+            Write-Host ("Power on the VM " + $NewEsxName) -ForegroundColor $DefaultColor
+            $trash = $newEsx | Start-VM
+        }
+        $nbNewEsx++
+    }
+}
+Write-Host "Waiting the vESX" -ForegroundColor $DefaultColor
+for ($i = 1; $i -lt $nbNewEsx; $i++) {
+    $oReturn = $false
+    while (!$oReturn) {
+        $oReturn = Test-Connection -computername ("192.168.1." + (20 + $i)) -Count 1 -quiet
+        Start-Sleep -Seconds 20
+    }
+}
+
+<#
 # Copy ISO files on datastores
 Write-Host ("{0} physical ESXi and {1} as vCenter host" -f $pEsx.Count, $vcenterHost) -ForegroundColor $DefaultColor
 $st = Get-Datastore
@@ -147,14 +145,28 @@ foreach ($o in $otherSt) {
     }
     $id2path[$myFile[0].DatastoreId] = $myFile[0].DatastoreFullPath
 }
-Write-Host "== Virtualized ESXi Configuration ==" -ForegroundColor $DefaultColor
-<#
-foreach ($h in $pEsx) {
-    $st = Get-Datastore -Id $h.DatastoreIdList[0]
-        $vm = Get-VM -Name "TestVM"
-    #$vm = New-VM -Name "TestVM" -ResourcePool $h -NumCPU 2 -MemoryGB 4 -DiskGB 40 -NetworkName "VM Network" -CD -DiskStorageFormat Thin
-    $cd = Get-CDDrive -VM $vm
-    $isopath = "{0}/Win10_1903_V2_English_x64.iso" -f $st.DatastoreBrowserPath
-    Set-CDDrive -CD $cd -IsoPath $isopath -StartConnected $true -Confirm:$false
+
+### Function Definitions
+Function uploadFile {
+    param (
+        [Parameter(Mandatory)]
+        [string]
+        $filename, 
+        [Parameter(Mandatory)]
+        [VMware.VimAutomation.ViCore.Types.V1.DatastoreManagement.Datastore]
+        $datastore
+    )
+    Write-Host ("Looking for {0} on datastore {1}" -f $filename, $datastore.Name) -ForegroundColor $DefaultColor
+    $myFile = Get-ChildItem -Path $datastore.DatastoreBrowserPath | Where-Object { $_.Name -like $filename }
+    if ($myFile.Count -eq 0) {
+        Write-Host "Upload the file on" $datastore.Name -ForegroundColor $DefaultColor
+        $copyFile = Copy-DatastoreItem -Item $fileFolder/$filename -Destination $datastore.DatastoreBrowserPath
+    }
+    else {
+        Write-Host ("{0} exists on {1}") -f $filename, $datastore -ForegroundColor $DefaultColor
+        $copyFile = $myFile[0]
+    }
+    $copyFile
 }
+### End of functions
 #>
