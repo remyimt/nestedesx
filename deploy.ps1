@@ -85,17 +85,7 @@ foreach ($e in $esxConfig) {
         try {
             $newEsx = Get-VM -Name $NewEsxName
             $mac = Get-NetworkAdapter -VM $newEsx | Select-Object MacAddress
-            if ($mac.MacAddress -eq $macAddr) {
-                Write-Host ("Checking {0} state" -f $NewEsxName) -ForegroundColor $DefaultColor
-                if ($newEsx.PowerState -eq "PoweredOn") {
-                    Write-Host ("{0} is running" -f $NewEsxName) -ForegroundColor $DefaultColor
-                }
-                else {
-                    Write-Host ("Starting {0}" -f $NewEsxName) -ForegroundColor $DefaultColor
-                    Start-VM -VM $newEsx
-                }
-            }
-            else {
+            if ($mac.MacAddress -ne $macAddr) {
                 Write-Host ("Wrong MAC for {0}" -f $NewEsxName) -ForegroundColor $ErrorColor
                 Write-Host ("Please set MAC address of the VM {0} to {1}" -f $NewEsxName, $macAddr) -ForegroundColor $ErrorColor
                 return
@@ -119,8 +109,8 @@ for ($i = 1; $i -le $nbNewEsx; $i++) {
     $vesxIP = "192.168.1." + ($ipOffset + $i)
     $oReturn = Test-Connection -computername $vesxIP -Count 1 -quiet
     while (!$oReturn) {
-        $oReturn = Test-Connection -computername $vesxIP -Count 1 -quiet
         Start-Sleep -Seconds 20
+        $oReturn = Test-Connection -computername $vesxIP -Count 1 -quiet
     }
 }
 
