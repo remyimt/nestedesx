@@ -1,38 +1,38 @@
 {
-    "switch": {
-        "user": "cisco",
-        "pwd": "switchmdp",
-        "wifi_key": "1234"
+  "switch": {
+    "user": "cisco",
+    "pwd": "switchpwd",
+    "wifi_key": "wifikey"
+  },
+  "vcenter": {
+    "ip": "192.168.1.30",
+    "user": "Administrator@vsphere.local",
+    "pwd": "vcenterpwd"
+  },
+  "physical_esx": [
+    {
+      "ip": "192.168.1.11",
+      "user": "root",
+      "pwd": "esxpwd",
+      "nb_vesx": 6
     },
-    "physical_esx": [
-        {
-            "ip": "192.168.1.12",
-            "user": "root",
-            "pwd": "rootmdp",
-            "nb_vesx": 2
-        },
-        {
-            "ip": "192.168.1.13",
-            "user": "root",
-            "pwd": "rootmdp",
-            "nb_vesx": 0
-        }
-    ],
-    "vcenter": {
-        "ip": "192.168.1.30",
-        "user": "Administrator@vsphere.local",
-        "pwd": "vspheremdp"
+    {
+      "ip": "192.168.1.12",
+      "user": "root",
+      "pwd": "esxpwd",
+      "nb_vesx": 6
     },
-    "virtual_esx": [
-        {
-            "ip": "192.168.1.21",
-            "user": "root",
-            "pwd": "rootmdp"
-        },
-        {
-            "ip": "192.168.1.22",
-            "user": "root",
-            "pwd": "rootmdp"
-        }
-    ]
+    {
+      "ip": "192.168.1.13",
+      "user": "root",
+      "pwd": "esxpwd",
+      "nb_vesx": 3
+    }
+  ],
+  "virtual_esx": [
+    {
+      "user": "root",
+      "pwd": "vesxpwd"
+    }
+  ]
 }
