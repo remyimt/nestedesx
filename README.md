@@ -12,9 +12,9 @@ Mon poste d'installation est un ubuntu-18.04.3-desktop-amd64.
 
 ### Configuration du switch
 * La connexion Internet est configurée sur l'entrée WAN du switch.
+* Il est conseillé de brancher le poste d'installation sur le switch pour accélérer l'installation du cluster.
 * Adresses IP statiques pour les NUC
   * IP dynamiques : 42.42.1.[90-120]
-  * Pinst 42.42.1.2 ac:87:a3:23:01:b2 (Poste d'installation)
   * Nuc1  42.42.1.11 b8:ae:ed:7c:3a:87
   * Nuc2  42.42.1.12 f4:4d:30:6a:8c:68
   * Nuc3  42.42.1.13 b8:ae:ed:7d:9e:80
