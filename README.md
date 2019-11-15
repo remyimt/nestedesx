@@ -19,6 +19,8 @@ Mon poste d'installation est un ubuntu-18.04.3-desktop-amd64.
   * Nuc2  42.42.1.12 f4:4d:30:6a:8c:68
   * Nuc3  42.42.1.13 b8:ae:ed:7d:9e:80
   * Nuc4  42.42.1.14 f4:4d:30:69:68:2c
+  * vesx1-30 42.42.1.[21-50] 00:50:56:a1:00:[01-50]
+  * **NOTE** : le dernier nombre des adresses MAC des vESXi ne contient pas de caractère hexadécimal
 ```text
 ================
 = Nuc3 == Nuc4 =
