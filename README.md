@@ -10,17 +10,15 @@ Mon poste d'installation est un ubuntu-18.04.3-desktop-amd64.
 * Fichier de configuration du vCenter [embedded_vCSA_on_ESXi.json] - Ne pas renommer
 * OVF d'un vESX [./vesx-ovf/vESX1/vESX1.ovf] - Ne pas renommer
 
-### Configuration du switch Cisco
-* Modèle : RV134W, doc : RV132W_RV134W.pdf
-* Le poste d'installation est relié en ethernet sur le switch.
+### Configuration du switch
 * La connexion Internet est configurée sur l'entrée WAN du switch.
 * Adresses IP statiques pour les NUC
-  * IP statiques : 192.168.1.[10-99]
-  * Pinst 192.168.1.10 ac:87:a3:23:01:b2 (Poste d'installation)
-  * Nuc1  192.168.1.11 b8:ae:ed:7c:3a:87
-  * Nuc2  192.168.1.12 f4:4d:30:6a:8c:68
-  * Nuc3  192.168.1.13 b8:ae:ed:7d:9e:80
-  * Nuc4  192.168.1.14 f4:4d:30:69:68:2c
+  * IP dynamiques : 42.42.1.[90-120]
+  * Pinst 42.42.1.2 ac:87:a3:23:01:b2 (Poste d'installation)
+  * Nuc1  42.42.1.11 b8:ae:ed:7c:3a:87
+  * Nuc2  42.42.1.12 f4:4d:30:6a:8c:68
+  * Nuc3  42.42.1.13 b8:ae:ed:7d:9e:80
+  * Nuc4  42.42.1.14 f4:4d:30:69:68:2c
 ```text
 ================
 = Nuc3 == Nuc4 =
@@ -42,8 +40,14 @@ Mon poste d'installation est un ubuntu-18.04.3-desktop-amd64.
   * Menu "root@192.x.x.x" > Settings > Décocher "Enable visual effects"
 
 ### Installation du vCenter
-* Choisir l'ESXi qui hébergera le vCenter et noter son adresse IP
+* Choisir l'ESXi qui hébergera le vCenter et noter son adresse IP et le nom de son datastore
+* Complèter le fichier de configuration *embedded_vCSA_on_ESXi.json* :
+  * Noter l'IP de l'ESXi dans le champs esxi/hostname
+  * Noter le mot de passe root dans le champs esxi/password
+  * Noter le nom du datastore dans le champs esxi/datastore
 * Télécharger l'ISO du vCenter Service Appliance [VMware-VCSA-all-6.7.0-10244745.iso]
+* Sous Ubuntu, installer la librairie libgconf
+  * sudo apt install libgconf2-4
 * Monter l'image sur le poste d'installation (Windows, Linux ou Mac) [Ubuntu 64 bits] et lancer l'installeur
    * mkdir /tmp/vcsa
    * sudo mount -o loop VMware-VCSA-all-6.7.0-10244745.iso /tmp/vcsa
@@ -51,6 +55,7 @@ Mon poste d'installation est un ubuntu-18.04.3-desktop-amd64.
 * **ATTENTION**: Dans le fichier *embedded_vCSA_on_ESXi.json* tous les  mots de passe sont en clair !
   * Modifier les mots de passe du le fichier *embedded_vCSA_on_ESXi.json* et les reporter dans le fichier *configuration.json*
   * ./vcsa-deploy install --accept-eula --no-ssl-certificate-verification ./Files/embedded_vCSA_on_ESXi.json
+  * **NOTE** : En cas de bug de l'installer graphique, effacer le répertoire ~/.config/Installer
 
 ### Installation de PowerCLI sur le poste d'installation
 * PowerShell
