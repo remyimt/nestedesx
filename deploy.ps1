@@ -24,15 +24,30 @@ $datacenter = "SchoolDatacenter"
 $vEsxOVF = "./Files/vesx-ovf/vesx1/vesx1.ovf"
 # Number of vESXi per datacenter
 $nbEsxPerDC = 3
-# Offset for IP address of vESXi
-$ipOffset = 40
 # New Datacenter basename
 $basenameDC = "G"
+# ISO files to upload on vESXi datastores
+$isoPrefix = "./Files/"
+$iso = @("tinycore.iso", "slitaz-rolling.iso")
 
 # Connection to vSphere
 Write-Host "Connecting to vSphere" -ForegroundColor $DefaultColor
-Connect-VIServer -Server $vcenterIp -User $vcenterUser -Password $vcenterPwd
-
+$oReturn = $false
+while (!$oReturn) {
+    try {
+        $oReturn = Connect-VIServer -Server $vcenterIp -User $vcenterUser -Password $vcenterPwd
+        while (!$oReturn) {
+            Write-Host "Connection failed ! New connection after 20 seconds..."
+            Start-Sleep -Seconds 20
+            $oReturn = Connect-VIServer -Server $vcenterIp -User $vcenterUser -Password $vcenterPwd
+        }
+    }
+    catch {
+        Write-Host "Connection failed ! New connection after 20 seconds..."    
+        Start-Sleep -Seconds 20
+        $oReturn = Connect-VIServer -Server $vcenterIp -User $vcenterUser -Password $vcenterPwd
+    }
+}
 Write-Host "== Physical ESXi Configuration =="
 # Add ESXi
 Write-Host "Configuring ESXi:" -ForegroundColor $DefaultColor
@@ -106,7 +121,7 @@ foreach ($e in $esxConfig) {
 $nbNewEsx--
 Write-Host "Waiting the vESX" -ForegroundColor $DefaultColor
 for ($i = 1; $i -le $nbNewEsx; $i++) {
-    $vesxIP = "192.168.1." + ($ipOffset + $i)
+    $vesxIP = $vConfig.ip_base + ($vConfig.ip_offset + $i)
     $oReturn = Test-Connection -computername $vesxIP -Count 1 -quiet
     while (!$oReturn) {
         Start-Sleep -Seconds 20
@@ -139,7 +154,7 @@ for ($i = 1; $i -le $nbNewEsx; $i++) {
     if (($i - 1) % $nbEsxPerDC -eq 0) {
         $dc = Get-Datacenter -Name ($basenameDC + ++$dcNumber)
     }
-    $vesxIP = "192.168.1." + ($ipOffset + $i)
+    $vesxIP = $vConfig.ip_base + ($vConfig.ip_offset + $i)
     try {
         $ip2obj[$e.ip] = Get-VMHost -Name $vesxIP -Location $dc
         Write-Host ("vESXi {0} is already connected" -f $vesxIP) -ForegroundColor $DefaultColor
@@ -152,5 +167,41 @@ for ($i = 1; $i -le $nbNewEsx; $i++) {
         Remove-Datastore -VMHost $ip2obj[$vesxIP] -Datastore $ds -Confirm:$false
         Write-Host ("Creating a new datastore for {0}" -f $vesxIP) -ForegroundColor $DefaultColor
         $ds = New-Datastore -VMHost $ip2obj[$vesxIP] -Name ("vDatastore" + $i) -Path mpx.vmhba0:C0:T0:L0 -Vmfs -Confirm:$false
+    }
+}
+
+# Copy ISO files on datastores
+Write-Host ("Copy files on vESXi datastores: {0}" -f $iso) -ForegroundColor $DefaultColor
+$ds = Get-Datastore -Name "vDatastore*"
+# DatastoreId = full_path - Use the full path to mount the ISO file
+$id2path = @{ }
+$firstSt, $otherSt = $ds
+foreach ($isoFile in $iso) {    
+    Write-Host ("Looking for {0} on datastore {1}" -f $isoFile, $firstSt.Name) -ForegroundColor $DefaultColor
+    $myFile = Get-ChildItem -Path $firstSt.DatastoreBrowserPath | Where-Object { $_.Name -like $isoFile }
+    if ($myFile.Count -eq 0) {
+        Write-Host "Upload the file on" $firstSt.Name -ForegroundColor $DefaultColor
+        Copy-DatastoreItem -Item ($isoPrefix + $isoFile) -Destination $firstSt.DatastoreBrowserPath
+        # Get the file for later copy
+        $myFile = Get-ChildItem -Path $firstSt.DatastoreBrowserPath | Where-Object { $_.Name -like $isoFile }
+    }
+    else {
+        Write-Host ("{0} exists on {1}" -f $isoFile, $firstSt.Name) -ForegroundColor $DefaultColor
+    }
+    $copyFile = $myFile[0]
+    $id2path[$copyFile.DatastoreId] = $copyFile.DatastoreFullPath
+
+    foreach ($o in $otherSt) {
+        Write-Host ("Looking for {0} on datastore {1}" -f $isoFile, $o.Name) -ForegroundColor $DefaultColor
+        $myFile = Get-ChildItem -Path $o.DatastoreBrowserPath | Where-Object { $_.Name -like $isoFile }
+        if ($myFile.Count -eq 0) {
+            Write-Host ("Upload the file on {0} from {1}" -f $o.Name, $firstSt.Name) -ForegroundColor $DefaultColor
+            Copy-DatastoreItem -Item $copyFile -Destination $o.DatastoreBrowserPath
+            $myFile = Get-ChildItem -Path $o.DatastoreBrowserPath | Where-Object { $_.Name -like $isoFile }
+        }
+        else {
+            Write-Host ("{0} exists on {1}" -f $isoFile, $o.Name) -ForegroundColor $DefaultColor
+        }
+        $id2path[$myFile[0].DatastoreId] = $myFile[0].DatastoreFullPath
     }
 }
