@@ -11,5 +11,5 @@ if [ $result -eq 0 ]; then
   echo "Cancel the operation 'Power off $host'"
 else
   echo "Power off $host"
-  ssh root@$host "poweroff"
+  ssh -o StrictHostKeyChecking=no root@$host "poweroff"
 fi
