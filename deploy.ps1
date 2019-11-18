@@ -28,7 +28,7 @@ $nbEsxPerDC = 3
 $basenameDC = "G"
 # ISO files to upload on vESXi datastores
 $isoPrefix = "./Files/"
-$iso = @()
+$iso = @("debian-10.1.0-amd64-netinst.iso")
 
 # Connection to vSphere
 Write-Host "Connecting to vSphere" -ForegroundColor $DefaultColor
@@ -56,6 +56,8 @@ foreach ($e in $esxConfig) {
     if (!$oReturn) {
         $missing += $e
     }
+    # Wait to avoid overfilling the network
+    Start-Sleep -Milliseconds 300
 }
 if ($missing.Count -gt 0) {
     Write-Host $missing.Count "ESXi are missing:" -ForegroundColor $ErrorColor
@@ -126,6 +128,8 @@ for ($i = 1; $i -le $nbNewEsx; $i++) {
         Start-Sleep -Seconds 20
         $oReturn = Test-Connection -computername $vesxIP -Count 1 -quiet
     }
+    # Wait to avoid overfilling the network
+    Start-Sleep -Milliseconds 300
 }
 
 Write-Host "Create datacenters for the vESXi" -ForegroundColor $DefaultColor
@@ -171,6 +175,10 @@ for ($i = 1; $i -le $nbNewEsx; $i++) {
         }
     }
 }
+
+# Enable Promiscuous mode to allow VM on nested ESXi to communicate
+Write-Host "Allow the promiscuous mode on virtual switches"
+Get-VirtualSwitch | Where-Object { !(Get-SecurityPolicy -VirtualSwitch $_).AllowPromiscuous } | Get-SecurityPolicy | Set-SecurityPolicy -AllowPromiscuous $true
 
 # Copy ISO files on datastores
 if ($iso.Count -gt 0) {
