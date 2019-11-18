@@ -177,7 +177,7 @@ for ($i = 1; $i -le $nbNewEsx; $i++) {
 }
 
 # Enable Promiscuous mode to allow VM on nested ESXi to communicate
-Write-Host "Allow the promiscuous mode on virtual switches"
+Write-Host "Allow the promiscuous mode on virtual switches" -F $DefaultColor
 Get-VirtualSwitch | Where-Object { !(Get-SecurityPolicy -VirtualSwitch $_).AllowPromiscuous } | Get-SecurityPolicy | Set-SecurityPolicy -AllowPromiscuous $true
 
 # Copy ISO files on datastores
