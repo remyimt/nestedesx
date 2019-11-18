@@ -45,7 +45,6 @@ while (!$oReturn) {
     catch {
         Write-Host "Connection failed ! New connection after 20 seconds..."    
         Start-Sleep -Seconds 20
-        $oReturn = Connect-VIServer -Server $vcenterIp -User $vcenterUser -Password $vcenterPwd
     }
 }
 Write-Host "== Physical ESXi Configuration =="
