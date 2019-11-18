@@ -12,7 +12,9 @@ while [ $result -ne 0 ]; do
 done
 sleep 20
 echo "Starting vCenter $vcenter"
-ssh root@$host "vim-cmd vmsvc/power.on 1"
+id=$(ssh root@$host "vim-cmd vmsvc/getallvms" | grep Embedded | cut -d ' ' -f1)
+echo "Starting the VM with the id $id"
+ssh root@$host "vim-cmd vmsvc/power.on $id"
 echo "Waiting vCenter $vcenter"
 ping -c 1 -W 3 $vcenter
 result=$?
