@@ -118,6 +118,17 @@ poweroff
   * Extinction des ESXi physiques
   * Ne pas oublier d'éteindre le switch ;)
 
+### Création d'utilisateurs ayant accès à un seul centre de données
+* À partir de l'interface du client vSphere, créer un nouvel utilisateur
+  * Menu > Administration
+  * Single Sign On > Users and Groups
+  * Domain: vsphere.local > Add user
+  * Username: adminG1, Password: adminG1$$
+* Attribuer l'utilisateur à un centre de données
+  * Menu > Home > Hosts and clusters
+  * Select the datacenter > Permissions
+  * + > User: vsphere.local, search for "adminG1", Role: Administrator, tick "Propagate to children"
+
 ### Resources
 * https://www.virtuallyghetto.com/2013/12/how-to-properly-clone-nested-esxi-vm.html
 
