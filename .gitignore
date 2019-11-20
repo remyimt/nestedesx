@@ -1,4 +1,5 @@
 *.iso
 *.ova
 *ovf
+vesx*
 configuration.json
