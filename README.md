@@ -49,14 +49,16 @@ Mon poste d'installation est un ubuntu-18.04.3-desktop-amd64.
   * Noter le nom du datastore dans le champs esxi/datastore
 * Télécharger l'ISO du vCenter Service Appliance [VMware-VCSA-all-6.7.0-10244745.iso]
 * Sous Ubuntu, installer la librairie libgconf
-  * sudo apt install libgconf2-4
+  * `sudo apt install libgconf2-4`
 * Monter l'image sur le poste d'installation (Windows, Linux ou Mac) [Ubuntu 64 bits] et lancer l'installeur
-   * mkdir /tmp/vcsa
-   * sudo mount -o loop VMware-VCSA-all-6.7.0-10244745.iso /tmp/vcsa
-   * cd /tmp/vcsa/vcsa-cli-installer/lin64/
+```
+mkdir /tmp/vcsa
+sudo mount -o loop VMware-VCSA-all-6.7.0-10244745.iso /tmp/vcsa
+cd /tmp/vcsa/vcsa-cli-installer/lin64/
+```
 * **ATTENTION**: Dans le fichier *embedded_vCSA_on_ESXi.json* tous les  mots de passe sont en clair !
   * Modifier les mots de passe du le fichier *embedded_vCSA_on_ESXi.json* et les reporter dans le fichier *configuration.json*
-  * ./vcsa-deploy install --accept-eula --no-ssl-certificate-verification ./Files/embedded_vCSA_on_ESXi.json
+  * `./vcsa-deploy install --accept-eula --no-ssl-certificate-verification ./Files/embedded_vCSA_on_ESXi.json`
   * **NOTE** : En cas de bug de l'installer graphique, effacer le répertoire ~/.config/Installer
 
 ### Installation de PowerCLI sur le poste d'installation
