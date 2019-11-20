@@ -13,12 +13,18 @@ $oReturn = Connect-VIServer -Server $vcenterIp -User $vcenterUser -Password $vce
 if ($oReturn) {
     $vms = Get-VM | Where-Object { $_.Name -notlike "vesx*" -and $_.Name -notlike "Embedded*" }
     Write-Host ("Detecting {0} VM to delete:" -f $vms.Count)
+    $vms
+    Start-Sleep -Seconds 5
     foreach ($v in $vms) {
         if ($v.PowerState -eq "PoweredOn") {
             Write-Host "Stopping the VM $v"
             Stop-VM -VM $v -Confirm:$false
-            Start-Sleep -Seconds 10
         }
+    }
+    Write-Host "Delete the following VM:"
+    $vms
+    Start-Sleep -Seconds 20
+    foreach ($v in $vms) {
         Remove-VM -VM $v -Confirm:$false
     }
 }
