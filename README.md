@@ -61,21 +61,21 @@ Mon poste d'installation est un ubuntu-18.04.3-desktop-amd64.
 
 ### Installation de PowerCLI sur le poste d'installation
 * PowerShell
-'''
+```
 curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
 curl https://packages.microsoft.com/config/ubuntu/16.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
 sudo apt-get update
 sudo apt-get install -y powershell
-'''
+```
 * PowerCLI
-'''
+```
 Install-Module -Name VMware.PowerCLI -Scope CurrentUser
 Update-Module -Name VMware.PowerCLI
-'''
+```
 
 ### Configuration de l'infrastructure
-* Start the powerShell shell : pwsh
-* Run the deployment script : ./deploy.ps1
+* Start the powerShell shell : `pwsh`
+* Run the deployment script : `./deploy.ps1`
 
 ### Création de l'OVF des ESXi virtuels (vESX)
 * Créer une nouvelle machine virtuelle
@@ -94,7 +94,7 @@ Update-Module -Name VMware.PowerCLI
 * Activer l'accès SSH sur l'ESXi fraîchement installé (vESXi)
   * Troubleshooting Options > Enable SSH
 * (Optionnel) Copier la clé SSH du poste d'installation
-  * cat ~/.ssh/id_rsa.pub | ssh root@IPvESXi 'cat >> /etc/ssh/keys-root/authorized_keys'
+  * `cat ~/.ssh/id_rsa.pub | ssh root@IPvESXi 'cat >> /etc/ssh/keys-root/authorized_keys'`
 * Suppression des UUID du vESXi
   * Se connecter via SSH sur le vESXi et entrer les commandes suivantes
 ```text
@@ -104,7 +104,7 @@ sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf
 poweroff
 ```
 * Création de l'OVF à partir d'un shell PowerShell (la connexion au vCenter doit être exécutée au préalable *vcenter-connect.ps1*)
-  * Get-VM -Name "vesx1" | Export-VApp -Destination vesx-ovf -Force
+  * `Get-VM -Name "vesx1" | Export-VApp -Destination vesx-ovf -Force`
 
 ### Arrêt automatique du cluster
 * Configuration des accès SSH des ESXi
@@ -112,8 +112,8 @@ poweroff
     * F2 > Troubleshooting Options > Enable SSH
   * **ATTENTION** : l'activation SSH via l'interface web n'est pas permanente et sera perdue après le redémarrage
 * Copier la clé SSH du poste d'installation sur les ESXi dans le bon fichier
-  * cat ~/.ssh/id_rsa.pub | ssh root@192.x.x.x 'cat >> /etc/ssh/keys-root/authorized_keys'
-* Utiliser le script 'shutdown.sh' pour éteindre le cluster
+  * `cat ~/.ssh/id_rsa.pub | ssh root@192.x.x.x 'cat >> /etc/ssh/keys-root/authorized_keys'`
+* Utiliser le script `shutdown.sh` pour éteindre le cluster
   * Extinction de toutes les VM
   * Extinction des ESXi physiques
   * Ne pas oublier d'éteindre le switch ;)
@@ -127,7 +127,7 @@ poweroff
 * Attribuer l'utilisateur à un centre de données
   * Menu > Home > Hosts and clusters
   * Select the datacenter > Permissions
-  * + > User: vsphere.local, search for "adminG1", Role: Administrator, tick "Propagate to children"
+  * Add > User: vsphere.local, search for "adminG1", Role: Administrator, tick "Propagate to children"
 
 ### Mise en place du vSan via l'interface graphique du vCenter
 * Les 3 vESXi sont déjà dans un datacenter
@@ -146,12 +146,12 @@ poweroff
   * VM Monitoring > cocher "VM Monitoring Only", "Failure Interval": 10, "Minimum uptime": 20
 * Installation de iptables sur yVM
   * root / VMware1!
-  * tce-load -wi iptables
+  * `tce-load -wi iptables`
 * À partir d'une machine externe, on lance un ping sur l'IP de la VM
-  * ping -W 3 -i 2 -O 192.168.x.x
+  * `ping -W 3 -i 2 -O 192.168.x.x`
 * Isolation de la VM
-  * ssh root@192.168.x.x "sudo iptables -P INPUT DROP && sudo iptables -P OUTPUT DROP && sudo iptables -P FORWARD DROP"
-  * Ctrl-C pour fermer la connexion SSH
+  * `ssh root@192.168.x.x "sudo iptables -P INPUT DROP && sudo iptables -P OUTPUT DROP && sudo iptables -P FORWARD DROP"`
+  * `Ctrl-C` pour fermer la connexion SSH
 
 #### Panne sur le serveur
 * Activer vMotion sur tous les serveurs du cluster
@@ -168,11 +168,13 @@ poweroff
   * Configure > vSphere DRS > Edit
 * Démarrer 3 VM sur un des vESXi
 * Installer stress dans les VM
-  * scp stress.tcz tc@192.168.x.x:
-  * ssh tc@192.168.x.x
-  * tce-load -i stress.tcz
+```
+scp stress.tcz tc@192.168.x.x:
+ssh tc@192.168.x.x
+tce-load -i stress.tcz
+```
 * Générer une charge CPU avec stress sur 2 des VM
-  * stress -c 1
+  * `stress -c 1`
 * Attendre que la migration soit effectuée
 
 ### Resources
