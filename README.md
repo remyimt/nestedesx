@@ -129,6 +129,53 @@ poweroff
   * Select the datacenter > Permissions
   * + > User: vsphere.local, search for "adminG1", Role: Administrator, tick "Propagate to children"
 
-### Resources
-* https://www.virtuallyghetto.com/2013/12/how-to-properly-clone-nested-esxi-vm.html
+### Mise en place du vSan via l'interface graphique du vCenter
+* Les 3 vESXi sont déjà dans un datacenter
+* Créer un cluster dans le datacenter (Ne pas activer vSan !)
+* Déplacer les vESXi dans le cluster
+* Activer le vSan sur les vESXi
+  * Configure > Networking / VMKernel Adapters > Edit > Cocher vSan
+* Activer le vSan du cluter
+  * Configure > vSan / Services > Enable vSan
+  * Laisser les valeurs par défaut (normalement, les disques durs des vESXi sont détectés)
 
+### TP High Availability
+#### Panne sur la VM (Ne fonctionne pas)
+* Activer le vSphere Availability sur le cluster souhaité
+  * Configure > vSphere Availability > Edit
+  * VM Monitoring > cocher "VM Monitoring Only", "Failure Interval": 10, "Minimum uptime": 20
+* Installation de iptables sur yVM
+  * root / VMware1!
+  * tce-load -wi iptables
+* À partir d'une machine externe, on lance un ping sur l'IP de la VM
+  * ping -W 3 -i 2 -O 192.168.x.x
+* Isolation de la VM
+  * ssh root@192.168.x.x "sudo iptables -P INPUT DROP && sudo iptables -P OUTPUT DROP && sudo iptables -P FORWARD DROP"
+  * Ctrl-C pour fermer la connexion SSH
+
+#### Panne sur le serveur
+* Activer vMotion sur tous les serveurs du cluster
+  * Configure > Networking / VMKernel Adapters > Edit
+* Démarrer une VM "yVM" sur le serveur A (vESXi)
+* Trouver la VM correspondant au vESXi et déconnecter la carte réseau
+  * Summary > Edit Settings > Décocher "Connected" du "Network adapter 1"
+* Attendre le déplacement de la VM "yVM"
+
+### TP DRS
+* Activer vMotion sur les vESXi
+  * Configure > Networking / VMKernel Adapters > Edit
+* Activer vSphere DRS sur le cluster
+  * Configure > vSphere DRS > Edit
+* Démarrer 3 VM sur un des vESXi
+* Installer stress dans les VM
+  * scp stress.tcz tc@192.168.x.x:
+  * ssh tc@192.168.x.x
+  * tce-load -i stress.tcz
+* Générer une charge CPU avec stress sur 2 des VM
+  * stress -c 1
+* Attendre que la migration soit effectuée
+
+### Resources
+* Clone vESXi: https://www.virtuallyghetto.com/2013/12/how-to-properly-clone-nested-esxi-vm.html
+* Promiscuous mode: https://isc.sans.edu/forums/diary/Running+Snort+on+VMWare+ESXi/15899/
+* vSan Configuration: https://www.vladan.fr/vmware-vsan-configuration/
