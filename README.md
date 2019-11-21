@@ -183,3 +183,7 @@ tce-load -i stress.tcz
 * Clone vESXi: https://www.virtuallyghetto.com/2013/12/how-to-properly-clone-nested-esxi-vm.html
 * Promiscuous mode: https://isc.sans.edu/forums/diary/Running+Snort+on+VMWare+ESXi/15899/
 * vSan Configuration: https://www.vladan.fr/vmware-vsan-configuration/
+
+### Troubleshooting
+* PowerCLI error: Operation is not valid due to the current state of the object.
+  * Quit PowerShell and restart it
