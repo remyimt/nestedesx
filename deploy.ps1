@@ -20,19 +20,27 @@ $vConfig = $config.virtual_esx
 # List of VM host objects
 $ip2obj = @{ }
 # ESXi Cluster Name
-$datacenter = "SchoolDatacenter"
-# Create vSan clusters
-#$vEsxOVF = "./Files/vesx-ovf/vesx1.ovf"
-$vEsxOVF = "./Files/vsan-ovf/vesx-vsan.ovf"
+$datacenter = $config.architecture.main_dc
+# Path to the OVF file to deploy
+$vEsxOVF = $config.architecture.ovf
 # Number of vESXi per datacenter
-$nbEsxPerDC = 3
+$nbEsxPerDC = $config.architecture.nb_vesx_datacenter
 # New Datacenter basename
-$basenameDC = "G"
+$basenameDC = $config.architecture.new_dc_basename
 # ISO files to upload on vESXi datastores
-$isoPrefix = "./Files/"
-$iso = @()
+$isoPrefix = $config.architecture.iso_prefix
+$iso = $config.architecture.iso
 # Developer mode (Disable ping requests)
 $developerMode = $false
+
+# Enable/disable the vSan Configuration
+try {
+    $vSanMode = [System.Convert]::ToBoolean($config.architecture.vsan) 
+}
+catch [FormatException] {
+    $vSanMode = $false
+}
+
 # Connection to vSphere
 Write-Host "Connecting to vSphere" -ForegroundColor $DefaultColor
 $oReturn = $false
@@ -172,14 +180,20 @@ for ($i = 1; $i -le $nbNewEsx; $i++) {
         Write-Host ("Add the host {0} to {1}" -f $vesxIP, $dc.Name) -ForegroundColor $DefaultColor
         $ip2obj[$vesxIP] = Add-VMHost -Name $vesxIP -Location $dc -User $vConfig.user -Password $vConfig.pwd -Force
         $ds = Get-Datastore -VMHost $ip2obj[$vesxIP]
+        $dsName = "vDatastore" + $i
         if ($ds.Count -gt 0) {
-            $dsName = "vDatastore" + $i
             if ($ds.Name -ne $dsName) {
                 Write-Host ("Removing the datastore of {0}" -f $vesxIP) -ForegroundColor $DefaultColor
-                Remove-Datastore -VMHost $ip2obj[$vesxIP] -Datastore $ds -Confirm:$false
+                Remove-Datastore -VMHost $ip2obj[$vesxIP] -Datastore $ds -Confirm:$false | Out-Null
                 Write-Host ("Creating a new datastore for {0}" -f $vesxIP) -ForegroundColor $DefaultColor
-                $ds = New-Datastore -VMHost $ip2obj[$vesxIP] -Name $dsName -Path mpx.vmhba0:C0:T0:L0 -Vmfs -Confirm:$false
+                New-Datastore -VMHost $ip2obj[$vesxIP] -Name $dsName -Path mpx.vmhba0:C0:T0:L0 -Vmfs -Confirm:$false | Out-Null
             }
+        }
+        elseif (!$vSanMode) {
+            # Create a datastore from the bigger disk
+            Write-Host ("Creating a new datastore for {0}" -f $vesxIP) -ForegroundColor $DefaultColor
+            $disks = Get-VMHostDisk -VMHost $ip2obj[$vesxIP] | Sort-Object -Descending -Property TotalSectors
+            New-Datastore -VMHost $ip2obj[$vesxIP] -Name $dsName -Path $disks[0].ScsiLun -Vmfs -Confirm:$false | Out-Null
         }
     }
 }
@@ -188,47 +202,49 @@ Write-Host "Allow the promiscuous mode on virtual switches" -F $DefaultColor
 Get-VirtualSwitch -Standard | Where-Object { !(Get-SecurityPolicy -VirtualSwitch $_).AllowPromiscuous } | Get-SecurityPolicy | Set-SecurityPolicy -AllowPromiscuous $true
 
 # Create vSan Clusters
-$dcs = Get-Datacenter -Name ($basenameDC + "*")
-Write-Host "Creating vSan clusters" -ForegroundColor $DefaultColor
-foreach ($d in $dcs) {
-    Write-Host ("Creating the cluster {0}" -f ("vSan" + $d.Name)) -ForegroundColor $DefaultColor
-    try {
-        $cl = Get-Cluster -Name ("vSan" + $d.Name)
-    }
-    catch {
-        $cl = New-Cluster -Name ("vSan" + $d.Name) -Location $d
-    }
-    Write-Host ("Configuring vESXi to create the vSan from the cluster {0}" -f $cl) -ForegroundColor $DefaultColor
-    foreach ($vmh in (Get-VMHost -Location $d)) {
-        while ($vmh.ConnectionState -ne "Connected") {
-            Write-Host ("The vESXi {0} is not connected. Waiting..." -f $vmh) -ForegroundColor $DefaultColor
-            Start-Sleep -Seconds 10
-            $vmh = Get-VMHost -Name $vmh.Name
+if ($vSanMode) {
+    $dcs = Get-Datacenter -Name ($basenameDC + "*")
+    Write-Host "Creating vSan clusters" -ForegroundColor $DefaultColor
+    foreach ($d in $dcs) {
+        Write-Host ("Creating the cluster {0}" -f ("vSan" + $d.Name)) -ForegroundColor $DefaultColor
+        try {
+            $cl = Get-Cluster -Name ("vSan" + $d.Name)
         }
-        Write-Host ("Configuring the vESXi {0}" -f $vmh) -ForegroundColor $DefaultColor
-        Move-VMHost -VMHost $vmh -Destination $cl | Out-Null
-        Write-Host "Enable vSan system" -ForegroundColor $DefaultColor
-        $na = Get-VMHostNetworkAdapter -VMHost $vmh -VMKernel | Where-Object { ! $_.VsanTrafficEnabled }
-        $na | Set-VMHostNetworkAdapter -VsanTrafficEnabled $true -Confirm:$false | Out-Null
-        $dataDisk = $vmh | Get-VMHostDisk | Where-Object { $_.TotalSectors -eq 83886080 }
-        if ($dataDisk.ScsiLun.VsanStatus -eq "Eligible") {
-            Write-Host "Configuring disks" -ForegroundColor $DefaultColor
-            $cacheDisk = $vmh | Get-VMHostDisk | Where-Object { $_.TotalSectors -eq 20971520 }
-            # Use RunAsync to run this task in order to avoid weird error (bug ?)
-            $task = New-VsanDiskGroup -VMHost $vmh -DataDiskCanonicalName $dataDisk -SsdCanonicalName $cacheDisk -RunAsync
-            while ($task.state -eq "Running") {
+        catch {
+            $cl = New-Cluster -Name ("vSan" + $d.Name) -Location $d
+        }
+        Write-Host ("Configuring vESXi to create the vSan from the cluster {0}" -f $cl) -ForegroundColor $DefaultColor
+        foreach ($vmh in (Get-VMHost -Location $d)) {
+            while ($vmh.ConnectionState -ne "Connected") {
+                Write-Host ("The vESXi {0} is not connected. Waiting..." -f $vmh) -ForegroundColor $DefaultColor
                 Start-Sleep -Seconds 10
-                $task = Get-Task -ID $task.id
+                $vmh = Get-VMHost -Name $vmh.Name
+            }
+            Write-Host ("Configuring the vESXi {0}" -f $vmh) -ForegroundColor $DefaultColor
+            Move-VMHost -VMHost $vmh -Destination $cl | Out-Null
+            Write-Host "Enable vSan system" -ForegroundColor $DefaultColor
+            $na = Get-VMHostNetworkAdapter -VMHost $vmh -VMKernel | Where-Object { ! $_.VsanTrafficEnabled }
+            $na | Set-VMHostNetworkAdapter -VsanTrafficEnabled $true -Confirm:$false | Out-Null
+            $dataDisk = $vmh | Get-VMHostDisk | Where-Object { $_.TotalSectors -eq 83886080 }
+            if ($dataDisk.ScsiLun.VsanStatus -eq "Eligible") {
+                Write-Host "Configuring disks" -ForegroundColor $DefaultColor
+                $cacheDisk = $vmh | Get-VMHostDisk | Where-Object { $_.TotalSectors -eq 20971520 }
+                # Use RunAsync to run this task in order to avoid weird error (bug ?)
+                $task = New-VsanDiskGroup -VMHost $vmh -DataDiskCanonicalName $dataDisk -SsdCanonicalName $cacheDisk -RunAsync
+                while ($task.state -eq "Running") {
+                    Start-Sleep -Seconds 10
+                    $task = Get-Task -ID $task.id
+                }
             }
         }
-    }
-    if (!$cl.VsanEnabled) {
-        Write-Host ("Configuring the vSan for the cluster {0}" -f ("vSan" + $d.Name)) -ForegroundColor $DefaultColor
-        Set-Cluster -Cluster $cl -VsanEnabled:$true -Confirm:$false
+        if (!$cl.VsanEnabled) {
+            Write-Host ("Configuring the vSan for the cluster {0}" -f ("vSan" + $d.Name)) -ForegroundColor $DefaultColor
+            Set-Cluster -Cluster $cl -VsanEnabled:$true -Confirm:$false
+        }
     }
 }
 # Copy ISO files on datastores
-if ($iso.Count -gt 0) {
+if ($iso.Count -gt 0 -and !$vSanMode) {
     Write-Host ("Copy files on vESXi datastores: {0}" -f $iso) -ForegroundColor $DefaultColor
     $ds = Get-Datastore -Name "vDatastore*"
     # DatastoreId = full_path - Use the full path to mount the ISO file
