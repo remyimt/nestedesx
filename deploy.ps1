@@ -183,7 +183,6 @@ for ($i = 1; $i -le $nbNewEsx; $i++) {
         }
     }
 }
-
 # Enable Promiscuous mode to allow VM on nested ESXi to communicate
 Write-Host "Allow the promiscuous mode on virtual switches" -F $DefaultColor
 Get-VirtualSwitch -Standard | Where-Object { !(Get-SecurityPolicy -VirtualSwitch $_).AllowPromiscuous } | Get-SecurityPolicy | Set-SecurityPolicy -AllowPromiscuous $true
@@ -201,6 +200,11 @@ foreach ($d in $dcs) {
     }
     Write-Host ("Configuring vESXi to create the vSan from the cluster {0}" -f $cl) -ForegroundColor $DefaultColor
     foreach ($vmh in (Get-VMHost -Location $d)) {
+        while ($vmh.ConnectionState -ne "Connected") {
+            Write-Host ("The vESXi {0} is not connected. Waiting..." -f $vmh) -ForegroundColor $DefaultColor
+            Start-Sleep -Seconds 10
+            $vmh = Get-VMHost -Name $vmh.Name
+        }
         Write-Host ("Configuring the vESXi {0}" -f $vmh) -ForegroundColor $DefaultColor
         Move-VMHost -VMHost $vmh -Destination $cl | Out-Null
         Write-Host "Enable vSan system" -ForegroundColor $DefaultColor
