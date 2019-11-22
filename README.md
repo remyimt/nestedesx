@@ -156,28 +156,38 @@ poweroff
   * `Ctrl-C` pour fermer la connexion SSH
 
 #### Panne sur le serveur
-* Activer vMotion sur tous les serveurs du cluster
-  * Configure > Networking / VMKernel Adapters > Edit
-* Démarrer une VM "yVM" sur le serveur A (vESXi)
-* Trouver la VM correspondant au vESXi et déconnecter la carte réseau
+* Démarrer une VM "yVM" sur un serveur (vESXi)
+* Tester la connexion vers yVM via ping ou SSH
+* Trouver la VM correspondant au vESXi
+  * Le numéro de la VM correspond au dernier nombre de l'IP - 20, par ex., 192.168.1.42 est l'IP de la VM vesx22 (42-20)
+* Déconnecter la carte réseau du vESXi
   * Summary > Edit Settings > Décocher "Connected" du "Network adapter 1"
+* Tester la connexion vers "yVM" via ping ou SSH
+* Reconnecter la carte réseau du vESXi
+* Activer HA sur le cluster
+  * Configure > vSphere Availability > Edit
+* Déconnecter la carte réseau du vESXi
 * Attendre le déplacement de la VM "yVM"
+* Tester la connexion vers "yVM" via ping ou SSH
 
 ### TP DRS
+* Démarrer 3 VM sur un des vESXi
+  * Clone VM: `New-VM -Name vm2 -VM (Get-VM -Name vm1) -VMHost (Get-VMHost -Name 192.168.x.x)`
+* Se connecter aux 3 VM en SSH et lancer les commandes
+```
+ssh tc@192.168.x.x
+tce-load -i stress.tcz
+stress -c 1
+```
+* Observer la charge "Host CPU" des VM et la noter après quelques minutes
+* Arrêter la charge CPU sur les VM
 * Activer vMotion sur les vESXi
   * Configure > Networking / VMKernel Adapters > Edit
 * Activer vSphere DRS sur le cluster
   * Configure > vSphere DRS > Edit
-* Démarrer 3 VM sur un des vESXi
-* Installer stress dans les VM
-```
-scp stress.tcz tc@192.168.x.x:
-ssh tc@192.168.x.x
-tce-load -i stress.tcz
-```
-* Générer une charge CPU avec stress sur 2 des VM
-  * `stress -c 1`
+* Générer une charge CPU avec stress les 3 VM
 * Attendre que la migration soit effectuée
+* Observer la charge "Host CPU" et la noter après quelques minutes
 
 ### Resources
 * Clone vESXi: https://www.virtuallyghetto.com/2013/12/how-to-properly-clone-nested-esxi-vm.html
