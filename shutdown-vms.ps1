@@ -48,9 +48,6 @@ if ($oReturn) {
             Stop-VMHost -VMHost $_ -Force -Confirm:$false
         }
     }
-    Write-Host "Shutdown the vCenter"
-    Shutdown-VMGuest -VM $vcenterVM -Confirm:$false
-    Start-Sleep -Seconds 30
 }
 else {
     Write-Host "Connection to vCenter failed !"
