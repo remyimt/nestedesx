@@ -1,0 +1,21 @@
+ 1. Trouver les courbes de consommation CPU d'un hyperviseur ESXi de votre centre de données
+   * Quel est l'interval de temps entre 2 mesures ?
+ 2. À quoi correspond le datastore de l'ESXi ?
+   * Que contient-il ?
+ 3. Créer 2 machines virtuelles sur des ESXi différents en utilisant l'ISO tinycore.iso. Démarrer la VM en mode ligne de commande.
+   * Tester la communication réseau entre les VM à partir de l'outil ping
+ 4. Effacer les machines virtuelles de l'espace de stockage
+ 5. Créer 2 machines virtuelles sur le même ESXi à partir de l'OVA tinycore.ova
+   * installer le package stress.tgz à l'aide de l'outil tce-load
+ 6. Créer une charge CPU avec l'outil stress. Observer les consommations CPU des VM et de l'hyperviseur.
+   * Noter les consommations CPU
+ 7. Arrêter le stress CPU
+ 8. Migrer une VM d'un ESXi à un autre. Comment la migration est-elle exécutée ?
+ 9. Supprimer les VM de l'espace de stockage
+10. Créer un cluster sans activer les modes proposés
+11. Activer le mode vSan des ESXi
+12. Ajouter (seulement après avoir activé le mode vSan) les ESXi dans le cluster
+13. Activer le mode vSan du cluster
+14. Quelle est la taille de l'espace de stockage disponible ? À quoi sert le mode vSan ?
+15. Créer une machine virtuelle à partir de l'OVA tinycore.ova
+16. Migrer la VM d'un ESXi à un autre. Comment la migration est-elle exécutée ? 
