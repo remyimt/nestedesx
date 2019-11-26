@@ -1,21 +1,101 @@
- 1. Trouver les courbes de consommation CPU d'un hyperviseur ESXi de votre centre de données
+Prise en main de l'interface graphique du vCenter (+vSan)
+ 1. Quelles sont les capacités CPU, Mémoire et Disk d'un ESXi ?
+ 2. Trouver les courbes de consommation CPU d'un hyperviseur ESXi
    * Quel est l'interval de temps entre 2 mesures ?
- 2. À quoi correspond le datastore de l'ESXi ?
-   * Que contient-il ?
- 3. Créer 2 machines virtuelles sur des ESXi différents en utilisant l'ISO tinycore.iso. Démarrer la VM en mode ligne de commande.
-   * Tester la communication réseau entre les VM à partir de l'outil ping
- 4. Effacer les machines virtuelles de l'espace de stockage
- 5. Créer 2 machines virtuelles sur le même ESXi à partir de l'OVA tinycore.ova
+ 3. Créer un espace de stockage de type VMFS d'environ 5 GB sur tous les ESXi
+ 4. Créer 2 machines virtuelles sur des ESXi différents en utilisant l'ISO tinycore.iso ayant les ressources suivantes :
+   * 1 VCPU, 500 MB de Mémoire, 500 MB d'espace de stockage
+   * Compte utilisateur : tc / VMware1!
+   * Démarrer la VM en mode ligne de commande puis tester la communication réseau entre les VM à partir de l'outil ping
+ 5. Effacer les machines virtuelles de l'espace de stockage
+ 6. Créer 2 machines virtuelles sur le même ESXi à partir de l'OVF tinyvm.ovf (un serveur SSH est inclus dans la VM)
    * installer le package stress.tgz à l'aide de l'outil tce-load
- 6. Créer une charge CPU avec l'outil stress. Observer les consommations CPU des VM et de l'hyperviseur.
-   * Noter les consommations CPU
- 7. Arrêter le stress CPU
- 8. Migrer une VM d'un ESXi à un autre. Comment la migration est-elle exécutée ?
- 9. Supprimer les VM de l'espace de stockage
-10. Créer un cluster sans activer les modes proposés
-11. Activer le mode vSan des ESXi
-12. Ajouter (seulement après avoir activé le mode vSan) les ESXi dans le cluster
-13. Activer le mode vSan du cluster
-14. Quelle est la taille de l'espace de stockage disponible ? À quoi sert le mode vSan ?
-15. Créer une machine virtuelle à partir de l'OVA tinycore.ova
-16. Migrer la VM d'un ESXi à un autre. Comment la migration est-elle exécutée ? 
+ 7. Créer une charge CPU avec l'outil stress. Observer les consommations CPU des VM et les consommations de chaque CPU de l'hyperviseur.
+   * Noter les consommations CPU après quelques minutes. Comment expliquez-vous ces chiffres ?
+ 8. Créer une troisième VM sur le même ESXi et effectuer un stress CPU
+ 9. Noter les consommations CPU de l'hyperviseur et des VM après quelques minutes.
+   * Les comparer avec les valeurs précédentes et expliquer ces chiffres.
+10. Arrêter le stress CPU
+11. Migrer une VM d'un ESXi à un autre. Quels sont les modes de migration utilisables ?
+12. Supprimer les VM de l'espace de stockage
+13. Créer un cluster sans activer les modes proposés
+14. Activer le mode vSan des ESXi
+15. Ajouter (seulement après avoir activé le mode vSan) les ESXi dans le cluster
+16. Activer le mode vSan (Single site cluster) du cluster
+17. Combien de datastores possèdent les ESXi ? À quoi sert le cluster vSan ?
+18. Créer une machine virtuelle à partir de l'OVF tinycore.ovf sur l'espace de stockage vSan et la démarrer.
+19. Migrer la VM d'un ESXi à un autre. Quels sont les modes de migration utilisables ?
+
+Correction :
+ 1.
+Summary > en haut à droite ou Monitor > Utilization ou Resource allocation
+ 2.
+Monitor > Performance > Overview - 1 mesure toutes les 20 secondes
+ 3.
+Actions > Storage > New Datastore
+ 4.
+Datastores > Clic sur le nom du datastore > Upload Files > Sélectionner le fichier ISO sur votre disque dur
+En cas d'erreur, se connecter à l'ESXi à partir du navigateur afin de valider le certificat (par ex., https://42.42.1.24)
+Clic droit sur l'ESXi > New Virtual Machine
+Clic droit sur la VM > Power On
+Se connecter sur la VM à partir de l'interface web du panneau "Summary"
+ 5.
+Clic droit sur la VM > Power Off
+Clic droit sur la VM > Delete From Disk
+ 6.
+Clic droit sur l'ESXi > Deploy OVF Template
+tce-load -i stress.tcz
+ 7. 
+Se connecter à la VM via l'interface web et récupérer l'adresse IP avec ifconfig
+ssh tc@tinyVM_IP
+stress -c 1
+Consommation VM : 50 %
+Consommation CPU 0 ESXi : 0 %
+Consommation CPU 1 ESXi : 100 %
+Les VM se partagent 1 CPU.
+
+ 9.
+Consommation VM : 33 %
+Consommation CPU 0 ESXi : 0 %
+Consommation CPU 1 ESXi : 100 %
+Les VM se partagent 1 CPU.
+
+Autres cas observé lors du démarrage de la 3e VM:
+1 VM stressée et 1 VM non stressée sur un CPU
+1 VM stressée sur l'autre CPU
+Consommation CPU 0 ESXi : 100 %
+Consommation CPU 1 ESXi : 100 %
+
+11.
+Seule la migration complète est autorisée !
+Activer vMotion sur les ESXi: Configure > VMKernel adaptaters > Edit > vMotion
+Glisser-déposer la VM sur un ESXi différent de son hôte actuel.
+Tester les différents modes de migration pour savoir lequels sont utilisables.
+
+12.
+Clic droit sur la VM > Power Off
+Clic droit sur la VM > Delete From Disk
+
+13.
+Clic droit sur le datacenter > New Cluster
+
+14. 
+Configure > VMKernel adaptaters > Edit > vSan
+
+15.
+Glisser-déposer les ESXi dans le cluster
+
+16.
+Clic sur le cluster > Configure > vSan / Services > Configure
+
+17.
+Clic sur un ESXi > Datastores
+Le cluster vSan permet de partager un datastore entre tous les ESXi du cluster.
+
+18.
+Clic sur un ESXi > Deploy OVF template
+
+19.
+Glisser-déposer la VM sur un ESXi différent de son hôte actuel.
+Tester les différents modes de migration pour savoir lequels sont utilisables.
+L'hôte actuel de la VM est disponible sur la page Summary de la VM.
