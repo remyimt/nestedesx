@@ -40,6 +40,13 @@ try {
 catch [FormatException] {
     $vSanMode = $false
 }
+# Add a default datastore to ESXi without datastore
+try {
+    $alwaysDatastore = [System.Convert]::ToBoolean($config.architecture.always_datastore) 
+}
+catch [FormatException] {
+    $alwaysDatastore = $false
+}
 
 # Connection to vSphere
 Write-Host "Connecting to vSphere" -ForegroundColor $DefaultColor
@@ -189,7 +196,7 @@ for ($i = 1; $i -le $nbNewEsx; $i++) {
                 New-Datastore -VMHost $ip2obj[$vesxIP] -Name $dsName -Path mpx.vmhba0:C0:T0:L0 -Vmfs -Confirm:$false | Out-Null
             }
         }
-        elseif (!$vSanMode) {
+        elseif ($alwaysDatastore) {
             # Create a datastore from the bigger disk
             Write-Host ("Creating a new datastore for {0}" -f $vesxIP) -ForegroundColor $DefaultColor
             $disks = Get-VMHostDisk -VMHost $ip2obj[$vesxIP] | Sort-Object -Descending -Property TotalSectors
