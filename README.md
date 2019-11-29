@@ -76,8 +76,48 @@ Update-Module -Name VMware.PowerCLI
 ```
 
 ### Configuration de l'infrastructure
-* Start the powerShell shell : `pwsh`
-* Run the deployment script : `./deploy.ps1`
+#### Démarrage rapide
+* Éditer le fichier de configuration `configuration.json`
+* Lancer le shell PowerShell: `pwsh`
+* Lancer le script de déploiement : `./deploy.ps1`
+
+#### Le fichier de configuration
+* **ATTENTION** Tous les comptes et mots de passe sont définis dans le fichier de configuration.
+* Le fichier de configuration est un fichier JSON. L'ordre des sections n'a pas d'importance. Toutes les propriétés disponibles sont présentees dans le `configuration.json` fourni comme exemple.
+##### La section *switch* (optionnelle)
+* Cette section est optionnelle car elle n'est pas utilisée par les scripts. Elle rassemble les informations d'administration et de connexion au switch pour faciliter le déroulement des exercices destinés aux étudiants.
+##### La section *vcenter* (obligatoire)
+* Cette section décrit les informations nécessaires à la gestion du vCenter (connexion, démarrage, arrêt).
+  * *ip* : IP du vCenter
+  * *host* : IP de l'ESXi hébergeant le vCenter
+  * *user* : Utilisateur pour se connecter à vSphere
+  * *pwd* : Mot de passe de l'utilisateur
+##### La section *physical_esx* (obligatoire)
+* Cette section décrit les informations nécessaires à la gestion des ESXi ainsi que le nombre de vESXi (ESXi installés dans des VM) hébergés par chaque ESXi (physique).
+  * *ip* : IP de l'ESXi
+  * *user* : Utilisateur pour se connecter à l'ESXi
+  * *pwd* : Mot de passe de l'utilisateur
+  * *nb_vesx* : Nombre de vESXi hébergés par l'ESXi
+##### La section *virtual_esx* (obligatoire)
+* Cette section décrit les informations utilisées pour la création des VM utilisées pour installer les ESXi virtuels (vESXi). 
+  * *user* : Utilisateur pour se connecter au vESXi
+  * *pwd* : Mot de passe de l'utilisateur
+  * *ip_base* : Trois premiers nombres de l'adresse IP des VM des vESXi
+  * *ip_offset* : Début du dernier nombre de l'adresse IP des VM des vESXi. Ce nombre est incrémenté de 1 à chaque création de VM.
+* Exemple de calcul d'IP
+  * *ip_base* : *42.42.1.*
+  * *ip_offset* : *40*
+  * La 1ère VM créée (premier vESXi) aura pour IP *42.42.1.41*, la 2e VM aura pour IP *42.42.1.42*, la 13e aura pour IP *42.42.1.53*
+##### La section *architecture* (obligatoire)
+* Cette section regroupe toutes les informations supplémentaires nécessaires à la création de l'infrastructure virtuelle.
+  * *main_dc* : Nom du datacenter contenant les ESXi physiques (ceux décrit dans la section *physical_esx*
+  * *new_dc_basename* : Début du nom des centres de données contenant les vESXi utilisés pour les exercices décrit dans les fichiers *tp-vcenter.txt* et *tp-ha-drs.txt*. À ce nom est concaténé le numéro de création du datacenter. Ce numéro est incrémenté à chaque création d'un datacenter.
+  * *nb_vesx_datacenter* : Nombre de datacenter contenant des vESXi
+  * *vsan* : Ajouter et configurer des clusters vSan dans chaque nouveau datacenter
+  * *always_datastore* : Créer un datastore à partir du disque le plus petit **si le vESXi n'en possède pas**. Si vSan est activé, deux datastore seront présents sur chaque vESXi.
+  * *ovf* : l'OVF à déployer pour la création des vESXi
+  * *iso_prefix* : Répertoire contenant les images ISO à copier sur le datastore des vESXi. **ATTENTION** il n'est pas possible de copier une image ISO sur un datastore de type vSan. **Le chemin DOIT finir par un /"**
+  * *iso*: Le nom des images ISO à copier sur le datastore des vESXi. Les noms doivent finir par *.iso*.
 
 ### Création de l'OVF des ESXi virtuels (vESX)
 * Créer une nouvelle machine virtuelle

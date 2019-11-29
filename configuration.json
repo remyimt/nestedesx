@@ -28,31 +28,22 @@
       "user": "root",
       "pwd": "toTO12!!",
       "nb_vesx": 3
-    },
-    {
-      "ip": "42.42.1.14",
-      "user": "root",
-      "pwd": "tototiti",
-      "nb_vesx": 3
     }
   ],
-  "virtual_esx": [
-    {
-      "user": "root",
-      "pwd": "superesx",
-      "ip_base": "42.42.1.",
-      "ip_offset": 20
-    }
-  ],
+  "virtual_esx": {
+    "user": "root",
+    "pwd": "superesx",
+    "ip_base": "42.42.1.",
+    "ip_offset": 20
+  },
   "architecture": {
     "main_dc": "SchoolDatacenter",
     "new_dc_basename": "StudentDC",
     "nb_vesx_datacenter": 3,
-    "vsan": "false",
+    "vsan": "true",
     "always_datastore": "false",
     "ovf": "./Files/vesxtp-ovf/vesx-tp.ovf",
     "iso_prefix": "./Files/",
-    "iso": [
-    ]
+    "iso": []
   }
 }

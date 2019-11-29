@@ -197,9 +197,9 @@ for ($i = 1; $i -le $nbNewEsx; $i++) {
             }
         }
         elseif ($alwaysDatastore) {
-            # Create a datastore from the bigger disk
+            # Create a datastore from the smallest disk
             Write-Host ("Creating a new datastore for {0}" -f $vesxIP) -ForegroundColor $DefaultColor
-            $disks = Get-VMHostDisk -VMHost $ip2obj[$vesxIP] | Sort-Object -Descending -Property TotalSectors
+            $disks = Get-VMHostDisk -VMHost $ip2obj[$vesxIP] | Sort-Object -Property TotalSectors
             New-Datastore -VMHost $ip2obj[$vesxIP] -Name $dsName -Path $disks[0].ScsiLun -Vmfs -Confirm:$false | Out-Null
         }
     }
