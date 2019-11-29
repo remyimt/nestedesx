@@ -1,0 +1,73 @@
+Fonctionnalités avancées du vCenter - Dynamic Resource Scheduler (DRS)
+13. Sur la tinyVM existante, installer le package stress.tcz avec la commande tce-load
+14. Cloner cette VM deux fois afin d'avoir 3 tinyVM démarrés sur le même ESXi
+15. Exécuter un stress CPU sur chaque VM. Quelles sont les consommations CPU de chaque VM et de l'hyperviseur après quelques minutes ?
+16. À quoi correspond la métrique de CPU appelée cpu_ready. Quelles sont ces valeurs ?
+17. Arrêter le stress CPU
+18. Activer le vMotion sur les ESXi
+19. Activer la gestion dynamique des ressources (DRS) du cluster.
+20. Exécuter un stress CPU sur les 3 VM et noter les consommations CPU après quelques minutes. Comment expliquez-vous ces valeurs ?
+21. Ajouter des règles de placement dans le cluster obligeant 2 VM à rester sur le premier serveur de votre cluster.
+  * Vous pouvez ajouter des règles à partir du panneau "VM/Host Rule" de l'onglet Configure.
+22. Décrivez les fonctions de chaque règle disponible
+
+
+Correction
+13.
+Récupérer l'IP de la VM sur leur page Summary
+ssh tc@42.42.1.101
+tce-load -i stress.tcz
+
+14.
+Clic droit sur la VM > Clone > Clone to Virtual Machine...
+Cocher la case "Power on virtual machine after creation"
+
+15.
+ssh tc@42.42.1.101
+stress -c 1
+Sélectionner l'ESXi hébergeant les VM > VMs
+ou
+Sélectionner l'ESXi ou la VM > Monitor > Performance / Overview
+
+Plusieurs cas possibles :
+CPU ESXi : 2 CPU à 100 %
+CPU VM : 75 %
+Normalement cette configuration est temporaire ! Ensuite, on se stabilise sur 
+
+CPU 0 ESXi : 100 %
+CPU 1 ESXi : 3 %
+CPU VM : 33 %
+Les 3 VM se partagent un seul CPU de l'ESXi. vCenter réserve l'autre CPU de l'ESXi pour la gestion des VM.
+
+16.
+CPU READY VM : 67 %
+Le cpu_ready représente le temps pendant lequel la VM est en attente d'obtenir une ressource CPU physique. Pendant ce temps là, elle n'exécute pas d'instructions.
+Quand les VM sont en attente du CPU physique de l'ESXi, elle ne consomme donc pas la ressource CPU.
+
+17.
+Ctrl-C dans les VM
+
+18.
+Sélectionner un ESXi > Configure > Networking / VMKernel Adaptaters > Edit > cocher vMotion
+
+19.
+Sélectionner le cluster > Services / vSphere DRS > Edit > vSphere DRS: On
+
+20.
+Il est possible que DRS migre les VM avant l'application du stress CPU. Il est seul juge de l'équilibrage du cluster.
+ssh tc@42.42.1.101
+tce-load -i stress.tcz
+CPU 0 ESXi : 100 %
+CPU 1 ESXi : 0 %
+CPU VM : 100 %
+CPU READY : 0 %
+
+Les ESXi ont suffisamment de ressources CPU pour fournir les  ressources demandées par leur VM. Les VM n'attendent pas la ressource CPU (cpu_ready proche de 0 %) et consomme un CPU physique dans sa totalité (CPU à 100%).
+
+21.
+Créer un groupe "monServeur" contenant le serveur : Configure > VM/Host Groups > Add > Host Group
+Créer un groupe "mesVM" contenant les 2 VM : Configure > VM/Host Groups > Add > VM Group
+Créer une règle de type "Virtual Machines to Hosts" en sélectionnant les groupes "monServeur" et "mesVM"
+
+22.
+

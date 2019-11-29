@@ -1,0 +1,71 @@
+Fonctionnalités avancées du vCenter - High Availability (HA)
+ 1. Créer une VM sur un ESXi à partir de l'OVF tinyvm.ovf et la démarrer
+    * TinyVM est une distribution Linux ultra légère démarrant en moins de 20s et embarquant quelques outils que nous allons utiliser pendant ce TP.
+ 2. Depuis votre machine, lancer un ping vers la tinyVM
+ 3. Provoquer un crash du système d'exploitation de la tinyVM
+    * La commande suivante crash la VM : sudo bash -c "echo c > /proc/sysrq-trigger"
+ 4. Vérifier l'absence de réponse au ping correspondant au crash de la VM
+ 5. Configurer le mode haute disponibilité pour obtenir un redémarrage des VM en cas de panne de l'hyperviseur (ESXi) et en cas de panne de la VM
+ 6. Quels sont les 2 paramètres utilisés pour détecter les pannes sur les VM ? Expliquez-les.
+ 7. Après avoir configuré correctement le mode HA du cluster, redémarrer la tinyVM
+ 8. Relancer le ping sur la VM et crasher de nouveau le système d'exploitation. Après quelques minutes, qu'observez-vous ? Pourquoi ?
+ 9. Quelle est la durée d'indisponiblité de la VM ? Comment réduire ce temps d'indisponibilité ?
+10. Tout en continuant à pinger la VM, provoquez un crash de l'ESXi. Après quelques minutes, qu'observez-vous ? Pourquoi ?
+    * La commande suivante crash l'ESXi : vsish -e set /reliability/crashMe/Panic 1
+11. Redémarrer la VM correspondant à l'ESXi crashé et attendez sa reconnexion au datacenter.
+12. Désactiver le mode HA
+
+Correction
+1.
+Clic droit sur un ESXi > Deploy OVF Template
+Clic droit sur la VM > Power On
+
+2.
+Récupérer l'IP de la VM sur sa page Summary
+ping -W 4 -i 5 42.42.1.93
+(un ping toutes les 5 secondes, on attend 4 s pour avoir la réponse. cf 'man ping')
+
+3.
+ssh tc@42.42.1.93
+sudo bash -c "echo c > /proc/sysrq-trigger"
+
+5.
+Sélectionner le cluster > Configure > vSphere Availibility > Edit
+vSphere HA: On
+Host Failure Response: Restart VMs
+VM Monitoring: VM Monitoring Only
+Enable heartbeat monitoring: VM Monitoring Only
+VM monitoring sensitivity: Custom, Failure interval: 30 seconds, Minimum uptime: 20 s
+
+6. Failure interval : Intervalle de temps durant lequel la VM n'émet plus son heartbeat avant que le service HA ne la redémarre.
+Minimum uptime : Temps donné à la VM pour démarrer son système d'exploitation et commencer à émettre des heartbeats. Pendant cettte période, l'activité de la VM n'est pas surveillée. Cela évite de redémarrer la VM avant qu'elle est finie sa phase de démarrage, et donc, de la redémarrer constamment.
+Pour les tinyVM, on peut réduire le "Minimum uptime" à 20 s car les VM démarrent très rapidement.
+
+7.
+(voir 5)
+Clic droit sur la VM > Power > Reset
+
+8.
+Pendant environ 3 minutes, la VM ne répond plus au ping car le système d'exploitation de la VM est crashé. Le service de haute disponiblité détecte le crash de la VM et la redémarre.
+
+9.
+La durée d'indisponibilité de la VM est d'environ 2min30s.
+ping -W 4 -i 5 42.42.1.93 | tee ping.txt
+cat ping.txt | grep Unreachable | wc -l
+On a un ping toutes les 5 s. "Le nombre de réponses négatives (Unreachable) * 5" nous donne le temps qu'il a fallu au service HA pour détecter la panne de la VM et redémarrer la VM.
+On peut réduire le temps d'indisponiblité en diminuant le temps du paramètre "Failure interval" ,par exemple, à 15 s.
+
+10.
+ssh root@42.42.1.21
+vsish -e set /reliability/crashMe/Panic 1
+Après environ 2 minutes, on pinge de nouveau la VM. L'ESXi est toujours crashé mais la VM a été redémarrée sur un autre ESXi.
+On peut voir l'hôte de la VM sur la page Summary de la VM (la propriété Host).
+
+11.
+Regardez les pages Summary des VM dont le nom commence par vesx. En comparant les IP, on peut identifier celle correspondant à l'ESXi crashé.
+Selectionner la VM > Power > Reset
+
+12.
+Sélectionner le cluster > Configure > vSphere Availibility > Edit
+vSphere HA: Off
+
