@@ -2,7 +2,7 @@ Prise en main de l'interface graphique du vCenter (+vSan)
  1. Quelles sont les capacités CPU, Mémoire et Disk d'un ESXi ?
  2. Trouver les courbes de consommation CPU d'un hyperviseur ESXi
    * Quel est l'interval de temps entre 2 mesures ?
- 3. Créer un espace de stockage de type VMFS d'environ 5 GB sur tous les ESXi
+ 3. Créer un espace de stockage de type VMFS à partir du disque de 6 GB sur tous les ESXi
  4. Créer 2 machines virtuelles sur des ESXi différents en utilisant l'ISO tinycore.iso ayant les ressources suivantes :
    * 1 VCPU, 500 MB de Mémoire, 500 MB d'espace de stockage
    * Compte utilisateur : tc / VMware1!
@@ -32,7 +32,7 @@ Summary > en haut à droite ou Monitor > Utilization ou Resource allocation
  2.
 Monitor > Performance > Overview - 1 mesure toutes les 20 secondes
  3.
-Actions > Storage > New Datastore
+Sélectionner un ESXi > Actions > Storage > New Datastore
  4.
 Datastores > Clic sur le nom du datastore > Upload Files > Sélectionner le fichier ISO sur votre disque dur
 En cas d'erreur, se connecter à l'ESXi à partir du navigateur afin de valider le certificat (par ex., https://42.42.1.24)
