@@ -75,11 +75,25 @@ Install-Module -Name VMware.PowerCLI -Scope CurrentUser
 Update-Module -Name VMware.PowerCLI
 ```
 
+### Description des fichiers
+* *configuration.json* : fichier de configuration
+* *delete-student-vms.ps1* : script PowerShell effaçant les VM n'étant pas des vESXi
+* *deploy.ps1* : Script PowerShell déployant l'infrastructure virtualisée via le vCenter
+* *set-permissions.ps1* : Script PowerShell configurant les droits des nouveaux utilisateurs pour l'exécution des TP
+* *shutdown-vms.ps1* : Script PowerShell pour éteindre le cluster sauf le vCenter
+* *start.sh* : Script bash pour démarrer le cluster une fois les NUC allumés
+* *stop.sh* : Script bash pour éteindre la totalité du cluster (sauf le switch)
+* *tp-drs.txt* : TP sur vSphere DRS
+* *tp-ha.txt* : TP sur vSphere HA
+* *tp-vcenter* : TP sur les bases du vCenter
+
 ### Configuration de l'infrastructure
 #### Démarrage rapide
 * Éditer le fichier de configuration `configuration.json`
 * Lancer le shell PowerShell: `pwsh`
 * Lancer le script de déploiement : `./deploy.ps1`
+* Créer un nouvel utilisateur par centre de données commençant par *new_dc_basename*. Le nom des utilisateurs doivent être *user_basename* suivi du numéro de création. Par exemple : adminDC1, adminDC2, adminDC3, adminDC4, etc. Les valeurs *new_dc_basename* et *user_basename* sont dans le fichier de configuration.
+* Lancer le script configurant les permissions des nouveaux utilisateurs : ./set-permissions.ps1
 
 #### Le fichier de configuration
 * **ATTENTION** Tous les comptes et mots de passe sont définis dans le fichier de configuration.
@@ -102,6 +116,7 @@ Update-Module -Name VMware.PowerCLI
 * Cette section décrit les informations utilisées pour la création des VM utilisées pour installer les ESXi virtuels (vESXi). 
   * *user* : Utilisateur pour se connecter au vESXi
   * *pwd* : Mot de passe de l'utilisateur
+  * *basename* : Base de nom utilisé pour créer les VM contenant les vESXi. Le nom complet est formé par cette base suivie d'un chiffre.
   * *ip_base* : Trois premiers nombres de l'adresse IP des VM des vESXi
   * *ip_offset* : Début du dernier nombre de l'adresse IP des VM des vESXi. Ce nombre est incrémenté de 1 à chaque création de VM.
 * Exemple de calcul d'IP
@@ -112,6 +127,7 @@ Update-Module -Name VMware.PowerCLI
 * Cette section regroupe toutes les informations supplémentaires nécessaires à la création de l'infrastructure virtuelle.
   * *main_dc* : Nom du datacenter contenant les ESXi physiques (ceux décrit dans la section *physical_esx*
   * *new_dc_basename* : Début du nom des centres de données contenant les vESXi utilisés pour les exercices décrit dans les fichiers *tp-vcenter.txt* et *tp-ha-drs.txt*. À ce nom est concaténé le numéro de création du datacenter. Ce numéro est incrémenté à chaque création d'un datacenter.
+  * *user_basename* : Base de nom utilisé pour créer les utilisateurs supplémentaires avec des droits restreints sur l'architecture.
   * *nb_vesx_datacenter* : Nombre de datacenter contenant des vESXi
   * *vsan* : Ajouter et configurer des clusters vSan dans chaque nouveau datacenter
   * *always_datastore* : Créer un datastore à partir du disque le plus petit **si le vESXi n'en possède pas**. Si vSan est activé, deux datastore seront présents sur chaque vESXi.
@@ -181,58 +197,61 @@ poweroff
   * Configure > vSan / Services > Enable vSan
   * Laisser les valeurs par défaut (normalement, les disques durs des vESXi sont détectés)
 
-### TP High Availability
-#### Panne sur la VM (Ne fonctionne pas)
-* Activer le vSphere Availability sur le cluster souhaité
-  * Configure > vSphere Availability > Edit
-  * VM Monitoring > cocher "VM Monitoring Only", "Failure Interval": 10, "Minimum uptime": 20
-* Installation de iptables sur yVM
-  * root / VMware1!
-  * `tce-load -wi iptables`
-* À partir d'une machine externe, on lance un ping sur l'IP de la VM
-  * `ping -W 3 -i 2 -O 192.168.x.x`
-* Isolation de la VM
-  * `ssh root@192.168.x.x "sudo iptables -P INPUT DROP && sudo iptables -P OUTPUT DROP && sudo iptables -P FORWARD DROP"`
-  * `Ctrl-C` pour fermer la connexion SSH
-
-#### Panne sur le serveur
-* Démarrer une VM "yVM" sur un serveur (vESXi)
-* Tester la connexion vers yVM via ping ou SSH
-* Trouver la VM correspondant au vESXi
-  * Le numéro de la VM correspond au dernier nombre de l'IP - 20, par ex., 192.168.1.42 est l'IP de la VM vesx22 (42-20)
-* Déconnecter la carte réseau du vESXi
-  * Summary > Edit Settings > Décocher "Connected" du "Network adapter 1"
-* Tester la connexion vers "yVM" via ping ou SSH
-* Reconnecter la carte réseau du vESXi
-* Activer HA sur le cluster
-  * Configure > vSphere Availability > Edit
-* Déconnecter la carte réseau du vESXi
-* Attendre le déplacement de la VM "yVM"
-* Tester la connexion vers "yVM" via ping ou SSH
-
-### TP DRS
-* Démarrer 3 VM sur un des vESXi
-  * Clone VM: `New-VM -Name vm2 -VM (Get-VM -Name vm1) -VMHost (Get-VMHost -Name 192.168.x.x)`
-* Se connecter aux 3 VM en SSH et lancer les commandes
+### Création d'une VM avec un système tinyCore à partir de l'ISO tinyCore.iso
+* Installation de tinyCore sur le disque dur
+  * Démarrer la VM et booter sur l'ISO
+  * `tce-load -wi tc-install`
+  * `sudo tc-install.sh`
+  * Éteindre la VM et retirer l'ISO
+* Installation du serveur SSH
+  * Créer un mot de passe pour l'utilisateur 'tc' : `passwd`
+  * Mot de passe : tiny00PWD
+  * `tce-install -wi openssh`
+  * `cd /usr/local/etc/ssh/`
+  * `sudo cp sshd_config.orig sshd_config`
+  * `sudo /usr/local/etc/init.d/openssh start`
+  * lancement du service au démarrage `vim /opt/bootlocal.sh`
 ```
-ssh tc@192.168.x.x
-tce-load -i stress.tcz
-stress -c 1
+#!/bin/sh
+# put other system startup commands here
+/usr/local/etc/init.d/openssh start
 ```
-* Observer la charge "Host CPU" des VM et la noter après quelques minutes
-* Arrêter la charge CPU sur les VM
-* Activer vMotion sur les vESXi
-  * Configure > Networking / VMKernel Adapters > Edit
-* Activer vSphere DRS sur le cluster
-  * Configure > vSphere DRS > Edit
-* Générer une charge CPU avec stress les 3 VM
-* Attendre que la migration soit effectuée
-* Observer la charge "Host CPU" et la noter après quelques minutes
+  * Sauvegarder les modifications : `filetool.sh -b`
+* Installation des VMware Tools
+  * `tce-load -wi open-vm-tools-desktop`
+  * Ajouter la ligne `/usr/local/etc/init.d/open-vm-tools start` au fichier `/opt/bootlocal.sh`
+  * `filetool.sh -b`
+* Sauvegarder les modifications sur le disque
+  * `vim /opt/.filetool.lst`
+```
+opt
+home
+/etc/shadow
+/usr/local/etc/ssh
+```
+  * `sudo vim /opt/bootlocal.sh`
+```
+/usr/local/etc/init.d/openssh start
+```
+  * `filetool.sh -b`
+* Installation de l'outil de stress
+  * Copier le fichier `stress.tcz` dans la VM via scp par exemple
+  * Déplacer le fichier vers le répertoire `/mnt/sda1/tce/optional/`
+  * Ajouter la ligne `stress.tcz` dans le fichier `/mnt/sda1/tce/onboot.lst`
+  * `filetool.sh -b`
+
+### Tolérance aux pannes (Fault Tolerance)
+* Pour activer la tolérance aux pannes sur une VM, il faut la configuration suivante :
+  * Un cluster vSan avec la vSphere HA activée
+  * Activer les options suivantes dans le VMkernel des ESXi : vMotion, Fault Tolerance Logging, vSan
+  * Créer une VM avec un disque utilisant le 'Thick Provisioning'
 
 ### Resources
 * Clone vESXi: https://www.virtuallyghetto.com/2013/12/how-to-properly-clone-nested-esxi-vm.html
 * Promiscuous mode: https://isc.sans.edu/forums/diary/Running+Snort+on+VMWare+ESXi/15899/
 * vSan Configuration: https://www.vladan.fr/vmware-vsan-configuration/
+* Install tinyCore: https://iotbytes.wordpress.com/install-microcore-tiny-linux-on-local-disk/
+* Install SSH on tinyCore: https://iotbytes.wordpress.com/configure-ssh-server-on-microcore-tiny-linux/
 
 ### Troubleshooting
 * PowerCLI error: Operation is not valid due to the current state of the object.
