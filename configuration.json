@@ -33,12 +33,14 @@
   "virtual_esx": {
     "user": "root",
     "pwd": "superesx",
+    "basename": "vesx",
     "ip_base": "42.42.1.",
     "ip_offset": 20
   },
   "architecture": {
     "main_dc": "SchoolDatacenter",
     "new_dc_basename": "StudentDC",
+    "user_basename": "adminDC",
     "nb_vesx_datacenter": 3,
     "vsan": "true",
     "always_datastore": "false",

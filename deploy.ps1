@@ -117,7 +117,7 @@ foreach ($e in $esxConfig) {
             $macAddr = "00:50:56:a1:00:" + $nbNewEsx
         }
         # Create one vESXi
-        $NewEsxName = "vesx" + $nbNewEsx
+        $NewEsxName = $vConfig.basename + $nbNewEsx
         try {
             $newEsx = Get-VM -Name $NewEsxName
             $mac = Get-NetworkAdapter -VM $newEsx | Select-Object MacAddress
