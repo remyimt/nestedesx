@@ -92,8 +92,8 @@ Update-Module -Name VMware.PowerCLI
 * Éditer le fichier de configuration `configuration.json`
 * Lancer le shell PowerShell: `pwsh`
 * Lancer le script de déploiement : `./deploy.ps1`
-* Créer un nouvel utilisateur par centre de données commençant par *new_dc_basename*. Le nom des utilisateurs doivent être *user_basename* suivi du numéro de création. Par exemple : adminDC1, adminDC2, adminDC3, adminDC4, etc. Les valeurs *new_dc_basename* et *user_basename* sont dans le fichier de configuration.
-* Lancer le script configurant les permissions des nouveaux utilisateurs : ./set-permissions.ps1
+* Créer un nouvel utilisateur par centre de données commençant par *new_dc_basename*, c.-à-d., les centres de données créés pour les étudiants. Le nom des utilisateurs doivent être *user_basename* suivi du numéro de création. Par exemple, si *user_basename* est "adminDC" : adminDC1, adminDC2, adminDC3, adminDC4, etc. Les valeurs *new_dc_basename* et *user_basename* sont définis dans le fichier de configuration.
+* Lancer le script configurant les permissions des nouveaux utilisateurs : `./set-permissions.ps1`
 
 #### Le fichier de configuration
 * **ATTENTION** Tous les comptes et mots de passe sont définis dans le fichier de configuration.

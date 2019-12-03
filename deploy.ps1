@@ -55,17 +55,17 @@ while (!$oReturn) {
     try {
         $oReturn = Connect-VIServer -Server $vcenterIp -User $vcenterUser -Password $vcenterPwd
         while (!$oReturn) {
-            Write-Host "Connection failed ! New connection after 20 seconds..."
+            Write-Host "Connection failed ! New connection after 20 seconds..." -ForegroundColor $DefaultColor
             Start-Sleep -Seconds 20
             $oReturn = Connect-VIServer -Server $vcenterIp -User $vcenterUser -Password $vcenterPwd
         }
     }
     catch {
-        Write-Host "Connection failed ! New connection after 20 seconds..."    
+        Write-Host "Connection failed ! New connection after 20 seconds..." -ForegroundColor $DefaultColor
         Start-Sleep -Seconds 20
     }
 }
-Write-Host "== Physical ESXi Configuration =="
+Write-Host "== Physical ESXi Configuration ==" -ForegroundColor $DefaultColor
 # Add ESXi
 Write-Host "Configuring ESXi:" -ForegroundColor $DefaultColor
 $missing = @()
@@ -103,6 +103,15 @@ foreach ($e in $esxConfig) {
     catch {
         Write-Host ("Add the host {0} to $datacenter" -f $e.ip) -ForegroundColor $DefaultColor
         $ip2obj[$e.ip] = Add-VMHost -Name $e.ip -Location $datacenter -User $e.user -Password $e.pwd -Force
+    }
+}
+# Waiting for ESXi connection
+foreach ($e in $esxConfig) {
+    $vmh = $ip2obj[$e.ip]
+    while ($vmh.ConnectionState -ne "Connected") {
+        Write-Host ("The vESXi {0} is not connected. Waiting..." -f $vmh) -ForegroundColor $DefaultColor
+        Start-Sleep -Seconds 10
+        $vmh = Get-VMHost -Name $vmh.Name
     }
 }
 Write-Host "== Virtualized ESXi Configuration ==" -ForegroundColor $DefaultColor
@@ -222,11 +231,6 @@ if ($vSanMode) {
         }
         Write-Host ("Configuring vESXi to create the vSan from the cluster {0}" -f $cl) -ForegroundColor $DefaultColor
         foreach ($vmh in (Get-VMHost -Location $d)) {
-            while ($vmh.ConnectionState -ne "Connected") {
-                Write-Host ("The vESXi {0} is not connected. Waiting..." -f $vmh) -ForegroundColor $DefaultColor
-                Start-Sleep -Seconds 10
-                $vmh = Get-VMHost -Name $vmh.Name
-            }
             Write-Host ("Configuring the vESXi {0}" -f $vmh) -ForegroundColor $DefaultColor
             Move-VMHost -VMHost $vmh -Destination $cl | Out-Null
             Write-Host "Enable vSan system" -ForegroundColor $DefaultColor
