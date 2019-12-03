@@ -1,5 +1,5 @@
 Fonctionnalités avancées du vCenter - Dynamic Resource Scheduler (DRS)
-15. Cloner cette VM deux fois afin d'avoir 3 tinyVM démarrés sur le même ESXi
+15. Cloner la tinyVM deux fois afin d'avoir 3 tinyVM démarrées sur le même ESXi
 16. Exécuter un stress CPU sur chaque VM. Quelles sont les consommations CPU de chaque VM et de l'hyperviseur après quelques minutes ?
 17. À quoi correspond la métrique de CPU appelée cpu_ready. Quelles sont ces valeurs ?
 18. Arrêter le stress CPU
