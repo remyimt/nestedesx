@@ -43,9 +43,9 @@
     "user_basename": "adminDC",
     "nb_vesx_datacenter": 3,
     "vsan": "true",
-    "always_datastore": "false",
+    "always_datastore": "true",
     "ovf": "./Files/vesxtp-ovf/vesx-tp.ovf",
     "iso_prefix": "./Files/",
-    "iso": []
+    "iso": [ "tinycore.iso", "VMware-VMvisor-Installer-6.5.0.update02-8294253.x86_64.iso" ]
   }
 }

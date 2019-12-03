@@ -255,9 +255,9 @@ if ($vSanMode) {
     }
 }
 # Copy ISO files on datastores
-if ($iso.Count -gt 0 -and !$vSanMode) {
+$ds = Get-Datastore -Name "vDatastore*"
+if ($iso.Count -gt 0 -and $ds.Count -gt 0) {
     Write-Host ("Copy files on vESXi datastores: {0}" -f $iso) -ForegroundColor $DefaultColor
-    $ds = Get-Datastore -Name "vDatastore*"
     # DatastoreId = full_path - Use the full path to mount the ISO file
     $id2path = @{ }
     $firstSt, $otherSt = $ds
