@@ -1,19 +1,22 @@
 Fonctionnalités avancées du vCenter - High Availability (HA)
- 1. Créer une VM sur un ESXi à partir de l'OVF tinyvm.ovf et la démarrer
-    * TinyVM est une distribution Linux ultra légère démarrant en moins de 20s et embarquant quelques outils que nous allons utiliser pendant ce TP.
+ 1. Créer une VM sur l'espace de stockage du vSan à partir de l'OVF tinyTP.ovf et la démarrer
+    TinyVM est une distribution Linux ultra légère démarrant en moins de 20s et embarquant quelques outils que nous allons utiliser pendant ce TP.
  2. Depuis votre machine, lancer un ping vers la tinyVM
  3. Provoquer un crash du système d'exploitation de la tinyVM
-    * La commande suivante crash la VM : sudo bash -c "echo c > /proc/sysrq-trigger"
+    La commande suivante crash la VM : sudo bash -c "echo c > /proc/sysrq-trigger"
  4. Vérifier l'absence de réponse au ping correspondant au crash de la VM
  5. Configurer le mode haute disponibilité pour obtenir un redémarrage des VM en cas de panne de l'hyperviseur (ESXi) et en cas de panne de la VM
- 6. Quels sont les 2 paramètres utilisés pour détecter les pannes sur les VM ? Expliquez-les.
+ 6. Quels sont les 2 paramètres utilisés lors de la détection de pannes sur les VM ? Expliquez-les
  7. Après avoir configuré correctement le mode HA du cluster, redémarrer la tinyVM
  8. Relancer le ping sur la VM et crasher de nouveau le système d'exploitation. Après quelques minutes, qu'observez-vous ? Pourquoi ?
  9. Quelle est la durée d'indisponiblité de la VM ? Comment réduire ce temps d'indisponibilité ?
-10. Tout en continuant à pinger la VM, provoquez un crash de l'ESXi. Après quelques minutes, qu'observez-vous ? Pourquoi ?
-    * La commande suivante crash l'ESXi : vsish -e set /reliability/crashMe/Panic 1
-11. Redémarrer la VM correspondant à l'ESXi crashé et attendez sa reconnexion au datacenter.
-12. Désactiver le mode HA
+10. Tout en continuant à pinger la VM, déconnecter la carte réseau de l'ESXi hôte. Après quelques minutes, qu'observez-vous ? Pourquoi ?
+11. Reconnecté la carte réseau de l'ESXi et attendez sa reconnexion au datacenter
+12. Activer la tolérance aux pannes (Fault Tolerance) sur la tinyVM
+13. Lancer un ping vers la VM et déconnecter la carte réseau de l'ESXi hôte. Attendre quelques minutes...
+    Quelle différence observez-vous entre le HA et la tolérance aux pannes ?
+    Combien de VM sont hébergées sur le cluster ? Comment fonctionne la tolérance aux pannes ?
+14. Désactiver la tolérance aux pannes et le HA
 
 Correction
 1.
@@ -56,16 +59,28 @@ On a un ping toutes les 5 s. "Le nombre de réponses négatives (Unreachable) * 
 On peut réduire le temps d'indisponiblité en diminuant le temps du paramètre "Failure interval" ,par exemple, à 15 s.
 
 10.
-ssh root@42.42.1.21
-vsish -e set /reliability/crashMe/Panic 1
-Après environ 2 minutes, on pinge de nouveau la VM. L'ESXi est toujours crashé mais la VM a été redémarrée sur un autre ESXi.
-On peut voir l'hôte de la VM sur la page Summary de la VM (la propriété Host).
+Vous pouvez identifier l'ESXi hébergeant de la VM à partir de la page Summary de celle-ci. Le champs "Host" donne l'adresse IP de l'ESXi. Celui-ci s'exécutant aussi dans une VM, on peut le retrouver en regardant les IP des VM nommé vesxN (N est un entier).
+On lance le ping vers la tinyVM
+ping -W 4 -i 5 42.42.1.93 | tee ping.txt
+On déconnecte la carte réseau de l'ESXi
+Sélectionner la VM vesxN > Summary > VM Hardware / Edit Settings > Network Adaptater 1 / Connected
+Après environ 2 minutes, on pinge de nouveau la VM. L'ESXi est toujours déconnecté mais la VM a été redémarrée sur un autre ESXi.
 
 11.
-Regardez les pages Summary des VM dont le nom commence par vesx. En comparant les IP, on peut identifier celle correspondant à l'ESXi crashé.
-Selectionner la VM > Power > Reset
+Sélectionner la VM vesxN > Summary > VM Hardware / Edit Settings > Network Adaptater 1 / Connected
 
 12.
+Configurer chaque ESXi du cluster en activant "vMotion" et "Fault Tolerance Logging"
+Sélectionner un ESXi > Configure > Networking / VMkernel Adapters > Edit
+Activer ensuite la tolérance aux pannes sur la tinyVM
+Clic droit sur la VM > Fault Tolerance > Turn On Fault Tolerance
+
+13.
+Lors de la déconnexion de l'ESXi hôte, les réponses négatives aux pings sont moins nombreuses (voire inexistantes). La VM est plus rapidement accessible car la migration est beaucoup plus rapide.
+On peut observer les VM s'exécutant sur le cluster dans l'onglet VMs du cluster. Il y a deux VM sur le cluster (une tinyVM primary et une tinyVM secondary).
+Lors de l'activation de la tolérance aux pannes, une copie de la VM s'exécute sur un autre ESXi, en parallèle. En cas de panne de la première VM, la deuxième VM assure la continuité de l'activité. La durée de la panne est donc considérablement réduite.
+
+14.
+Sélectionner la tinyVM > Fault Tolerance > Turn Off Fault Tolerance
 Sélectionner le cluster > Configure > vSphere Availibility > Edit
 vSphere HA: Off
-

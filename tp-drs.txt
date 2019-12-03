@@ -1,31 +1,26 @@
 Fonctionnalités avancées du vCenter - Dynamic Resource Scheduler (DRS)
-13. Sur la tinyVM existante, installer le package stress.tcz avec la commande tce-load
-14. Cloner cette VM deux fois afin d'avoir 3 tinyVM démarrés sur le même ESXi
-15. Exécuter un stress CPU sur chaque VM. Quelles sont les consommations CPU de chaque VM et de l'hyperviseur après quelques minutes ?
-16. À quoi correspond la métrique de CPU appelée cpu_ready. Quelles sont ces valeurs ?
-17. Arrêter le stress CPU
-18. Activer le vMotion sur les ESXi
-19. Activer la gestion dynamique des ressources (DRS) du cluster.
-20. Exécuter un stress CPU sur les 3 VM et noter les consommations CPU après quelques minutes. Comment expliquez-vous ces valeurs ?
-21. Ajouter des règles de placement dans le cluster obligeant 2 VM à être hébergées sur le même ESXi. Ces 2 VM devront être hébergées sur un des deux premiers serveurs du cluster. 
+15. Cloner cette VM deux fois afin d'avoir 3 tinyVM démarrés sur le même ESXi
+16. Exécuter un stress CPU sur chaque VM. Quelles sont les consommations CPU de chaque VM et de l'hyperviseur après quelques minutes ?
+17. À quoi correspond la métrique de CPU appelée cpu_ready. Quelles sont ces valeurs ?
+18. Arrêter le stress CPU
+19. Activer le vMotion sur les ESXi
+20. Activer la gestion dynamique des ressources (DRS) du cluster.
+21. Exécuter un stress CPU sur les 3 VM et noter les consommations CPU après quelques minutes. Comment expliquez-vous ces valeurs ?
+22. Ajouter des règles de placement dans le cluster obligeant 2 VM à être hébergées sur le même ESXi. Ces 2 VM devront être hébergées sur un des deux premiers serveurs du cluster. 
     Par exemple, les VM vm1 et vm2 doivent :
       s'exécuter toutes les deux sur l'hyperviseur h1
       OU
       s'exécuter toutes les deux sur l'hyperviseur h2.
-  * Vous pouvez ajouter des règles à partir du panneau "VM/Host Rule" de l'onglet Configure.
-22. Décrivez les fonctions des règles disponibles
+  Vous pouvez ajouter des règles à partir du panneau "VM/Host Rule" de l'onglet Configure.
+  Quelles règles avez-vous utilisées ?
+23. Décrivez les fonctions des règles disponibles
 
 Correction
-13.
-Récupérer l'IP de la VM sur leur page Summary
-ssh tc@42.42.1.101
-tce-load -i stress.tcz
-
-14.
+15.
 Clic droit sur la VM > Clone > Clone to Virtual Machine...
 Cocher la case "Power on virtual machine after creation"
 
-15.
+16.
 ssh tc@42.42.1.101
 stress -c 1
 Sélectionner l'ESXi hébergeant les VM > VMs
@@ -42,21 +37,21 @@ CPU 1 ESXi : 3 %
 CPU VM : 33 %
 Les 3 VM se partagent un seul CPU de l'ESXi. vCenter réserve l'autre CPU de l'ESXi pour la gestion des VM.
 
-16.
+17.
 CPU READY VM : 67 %
 Le cpu_ready représente le temps pendant lequel la VM est en attente d'obtenir une ressource CPU physique. Pendant ce temps là, elle n'exécute pas d'instructions.
 Quand les VM sont en attente du CPU physique de l'ESXi, elle ne consomme donc pas la ressource CPU.
 
-17.
+18.
 Ctrl-C dans les VM
 
-18.
+19.
 Sélectionner un ESXi > Configure > Networking / VMKernel Adaptaters > Edit > cocher vMotion
 
-19.
+20.
 Sélectionner le cluster > Services / vSphere DRS > Edit > vSphere DRS: On
 
-20.
+21.
 Il est possible que DRS migre les VM avant l'application du stress CPU. Il est seul juge de l'équilibrage du cluster.
 ssh tc@42.42.1.101
 tce-load -i stress.tcz
@@ -67,7 +62,7 @@ CPU READY : 0 %
 
 Les ESXi ont suffisamment de ressources CPU pour fournir les  ressources demandées par leur VM. Les VM n'attendent pas la ressource CPU (cpu_ready proche de 0 %) et consomme un CPU physique dans sa totalité (CPU à 100%).
 
-21.
+22.
 Créer un groupe "mesHyperviseurs" contenant les 2 hyperviseurs : Configure > VM/Host Groups > Add > Host Group
 Créer un groupe "mesVM" contenant les 2 VM : Configure > VM/Host Groups > Add > VM Group
 Créer une règle de type "Virtual Machines to Hosts" en sélectionnant le groupe de VM "mesVM",
@@ -77,7 +72,7 @@ Créer une règle de type "Keep Virtual Machines Together" en sélectionnant le 
 Pour créer une règle : Sélectionner le cluter > Configure > VM/Host Rules > Add
 Pour créer un groupe : Sélectionner le cluter > Configure > VM/Host Groups > Add
 
-22.
+23.
 Liste des VM/Host rules :
 Keep Virtual Machines Together :
   * Les VM du groupe doivent être hébergés par le même hyperviseur.
