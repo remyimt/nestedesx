@@ -118,27 +118,51 @@ Write-Host "== Virtualized ESXi Configuration ==" -ForegroundColor $DefaultColor
 # Create VM from OVF
 $nbNewEsx = 1
 foreach ($e in $esxConfig) {
+    try {
+        $cloneSrc = Get-VM -Name ($vConfig.basename + 1)
+        $createFromClone = $true
+    }
+    catch {
+        $createFromClone = $false
+    }
     for ($i = 0; $i -lt $e.nb_vesx; $i++) {
+        # Compute the MAC address
         if ($nbNewEsx -lt 10) {
             $macAddr = "00:50:56:a1:00:0" + $nbNewEsx
         }
         else {
             $macAddr = "00:50:56:a1:00:" + $nbNewEsx
         }
-        # Create one vESXi
+        # Compute the vESXi name
         $NewEsxName = $vConfig.basename + $nbNewEsx
+        # Retrieve the vESXi
         try {
             $newEsx = Get-VM -Name $NewEsxName
+            # Check the MAC address
             $mac = Get-NetworkAdapter -VM $newEsx | Select-Object MacAddress
             if ($mac.MacAddress -ne $macAddr) {
-                Write-Host ("Wrong MAC for {0}" -f $NewEsxName) -ForegroundColor $ErrorColor
-                Write-Host ("Please set MAC address of the VM {0} to {1}" -f $NewEsxName, $macAddr) -ForegroundColor $ErrorColor
+                Write-Host ("Wrong MAC address for {0}" -f $NewEsxName) -ForegroundColor $ErrorColor
+                Write-Host ("Please set the MAC address of the VM {0} to {1}" -f $NewEsxName, $macAddr) -ForegroundColor $ErrorColor
                 return
+            }
+            # Check the host
+            if ($ip2obj[$e.ip] -ne (Get-VMHost -VM $newEsx)) {
+                Write-Host ("Wrong host for {0}" -f $NewEsxName) -ForegroundColor $ErrorColor
+                Write-Host ("Please set the host of the VM {0} to {1}" -f $NewEsxName, $ip2obj[$e.ip]) -ForegroundColor $ErrorColor
             }
         }
         catch {
+            # Create the vESXi from OVF
             Write-Host ("Creating the virtualized ESXi " + $NewEsxName) -ForegroundColor $DefaultColor
-            $newEsx = Import-vApp -Source $vEsxOVF -VMHost $ip2obj[$e.ip] -Name $NewEsxName -DiskStorageFormat Thin
+            if ($createFromClone) {
+                $newEsx = New-VM -VM $cloneSrc -VMHost $ip2obj[$e.ip] -Name $NewEsxName -DiskStorageFormat Thin
+            }
+            else {
+                $newEsx = Import-vApp -Source $vEsxOVF -VMHost $ip2obj[$e.ip] -Name $NewEsxName -DiskStorageFormat Thin
+                $createFromClone = $true
+                $cloneSrc = $newEsx
+            }
+            # Set the MAC address
             $newEsx | Get-NetworkAdapter | Set-NetworkAdapter -MacAddress $macAddr -Confirm:$false -StartConnected:$true | Out-Null
         }
         if ($newEsx.PowerState -eq "PoweredOff") {
@@ -181,13 +205,14 @@ for ($i = 1; $i -le $nbDC; $i++) {
         $dc = New-Datacenter -Location $folder -Name $dcName
     }
 }
-Write-Host ("Add vESXi to the datacenter " + $dcName) -ForegroundColor $DefaultColor
+Write-Host "Add vESXi to datacenters " -ForegroundColor $DefaultColor
 $dcNumber = 0
 for ($i = 1; $i -le $nbNewEsx; $i++) {
     if (($i - 1) % $nbEsxPerDC -eq 0) {
         $dc = Get-Datacenter -Name ($basenameDC + ++$dcNumber)
     }
     $vesxIP = $vConfig.ip_base + ($vConfig.ip_offset + $i)
+    Write-Host ("Add vESXi {0} to {1}" -f $vesxIP, $dc.Name) -ForegroundColor $DefaultColor
     try {
         $ip2obj[$e.ip] = Get-VMHost -Name $vesxIP -Location $dc
         Write-Host ("vESXi {0} is already connected" -f $vesxIP) -ForegroundColor $DefaultColor
