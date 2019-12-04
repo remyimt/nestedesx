@@ -62,7 +62,7 @@ cd /tmp/vcsa/vcsa-cli-installer/lin64/
 ./vcsa-deploy install --accept-eula --no-ssl-certificate-verification ./Files/embedded_vCSA_on_ESXi.json
 ```
 
-##### Note sur l'installateur graphique
+##### Notes sur l'installateur graphique
 * Sous Ubuntu, installer la librairie libgconf
   * `sudo apt install libgconf2-4`
 * En cas de bug de l'installeur graphique, effacer le répertoire ~/.config/Installer
@@ -95,8 +95,8 @@ Les valeurs *new_dc_basename* et *user_basename* sont définis dans le fichier d
 * Lancer le script configurant les permissions des nouveaux utilisateurs : `./set-permissions.ps1`
 
 ### Le fichier de configuration
-**ATTENTION** Tous les comptes et mots de passe sont définis dans le fichier de configuration.
-Le fichier de configuration est un fichier JSON. L'ordre des sections n'a pas d'importance.
+* **ATTENTION** Tous les comptes et mots de passe sont définis dans le fichier de configuration.
+* Le fichier de configuration est un fichier JSON. L'ordre des sections n'a pas d'importance.
 Toutes les propriétés disponibles sont présentes dans le `configuration.json` fourni.
 #### La section *switch* (optionnelle)
 * Cette section est optionnelle car elle n'est pas utilisée par les scripts. Elle rassemble les informations d'administration
