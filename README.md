@@ -41,29 +41,31 @@ image ISO VMvisor [VMware-VMvisor-Installer-6.5.0.update02-8294253.x86_64.iso]
   * mot de passe root : (voir configuration.json)
   * **NOTE** : Ne pas retirer la prise de l'écran lors de l'installation car on doit redémarrer le NUC pour récupérer
   l'affichage (même après installation de l'ESXi)
-* **ATTENTION** : Pour la création d'une VM via l'interface Web de l'ESXi, désactiver les effets graphiques peut corriger
-les problèmes d'affichage, par exemple, des propriétés de la VM :
+* **ATTENTION** : Pour la création d'une VM via l'interface Web de l'ESXi, désactiver les effets graphiques peut
+corriger les problèmes d'affichage, par exemple, des propriétés de la VM :
   * Menu "root@192.x.x.x" > Settings > Décocher "Enable visual effects"
 
 #### Installation du vCenter
+* Télécharger l'ISO du vCenter Service Appliance [VMware-VCSA-all-6.7.0-10244745.iso]
 * Choisir l'ESXi qui hébergera le vCenter et noter son adresse IP et le nom de son datastore
 * Complèter le fichier de configuration *embedded_vCSA_on_ESXi.json* :
   * Noter l'IP de l'ESXi dans le champs esxi/hostname
   * Noter le mot de passe root dans le champs esxi/password
   * Noter le nom du datastore dans le champs esxi/datastore
-* Télécharger l'ISO du vCenter Service Appliance [VMware-VCSA-all-6.7.0-10244745.iso]
-* Sous Ubuntu, installer la librairie libgconf
-  * `sudo apt install libgconf2-4`
-* Monter l'image sur le poste d'installation (Windows, Linux ou Mac) [Ubuntu 64 bits] et lancer l'installeur
+* Modifier les mots de passe du fichier *embedded_vCSA_on_ESXi.json* et les reporter dans le fichier *configuration.json*
+* **ATTENTION**: Dans les fichiers *embedded_vCSA_on_ESXi.json* et *configuration.json* tous les mots de passe sont en clair !
+* Monter l'image sur le poste d'installation (Windows, Linux ou Mac) et lancer l'installeur en précisant le chemin vers le fichier *embedded_vCSA_on_ESXi.json*
 ```
 mkdir /tmp/vcsa
 sudo mount -o loop VMware-VCSA-all-6.7.0-10244745.iso /tmp/vcsa
 cd /tmp/vcsa/vcsa-cli-installer/lin64/
+./vcsa-deploy install --accept-eula --no-ssl-certificate-verification ./Files/embedded_vCSA_on_ESXi.json
 ```
-* **ATTENTION**: Dans le fichier *embedded_vCSA_on_ESXi.json* tous les  mots de passe sont en clair !
-  * Modifier les mots de passe du le fichier *embedded_vCSA_on_ESXi.json* et les reporter dans le fichier *configuration.json*
-  * `./vcsa-deploy install --accept-eula --no-ssl-certificate-verification ./Files/embedded_vCSA_on_ESXi.json`
-  * **NOTE** : En cas de bug de l'installer graphique, effacer le répertoire ~/.config/Installer
+
+##### Note sur l'installateur graphique
+* Sous Ubuntu, installer la librairie libgconf
+  * `sudo apt install libgconf2-4`
+* En cas de bug de l'installeur graphique, effacer le répertoire ~/.config/Installer
 
 #### Création de l'infrastructure virtuelle
 ##### Installation de PowerCLI sur le poste d'installation
@@ -93,9 +95,9 @@ Les valeurs *new_dc_basename* et *user_basename* sont définis dans le fichier d
 * Lancer le script configurant les permissions des nouveaux utilisateurs : `./set-permissions.ps1`
 
 ### Le fichier de configuration
-* **ATTENTION** Tous les comptes et mots de passe sont définis dans le fichier de configuration.
-* Le fichier de configuration est un fichier JSON. L'ordre des sections n'a pas d'importance.
-Toutes les propriétés disponibles sont présentees dans le `configuration.json` fourni comme exemple.
+**ATTENTION** Tous les comptes et mots de passe sont définis dans le fichier de configuration.
+Le fichier de configuration est un fichier JSON. L'ordre des sections n'a pas d'importance.
+Toutes les propriétés disponibles sont présentes dans le `configuration.json` fourni.
 #### La section *switch* (optionnelle)
 * Cette section est optionnelle car elle n'est pas utilisée par les scripts. Elle rassemble les informations d'administration
 et de connexion au switch pour faciliter le déroulement des exercices destinés aux étudiants.
