@@ -28,7 +28,7 @@ while (!$oReturn) {
     }
 }
 Write-Host "Delete Student VM:"
-$vms = Get-VM | Where-Object { $_.Name -notlike "vesx*" -and $_.Name -notlike "Embedded*" }
+$vms = Get-VM | Where-Object { $_.Name -notlike "vesx*" -and $_.Name -notlike "Embedded*" -and (Get-VMHost -VM $_).ConnectionState -eq "Connected" }
 $vms | Where-Object { $_.PowerState -eq "PoweredOn" } | Stop-VM -Confirm:$false
 $vms | Remove-VM -DeletePermanently -Confirm:$false
 Write-Host "Delete vESXi VM:"
