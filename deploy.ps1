@@ -30,8 +30,6 @@ $basenameDC = $config.architecture.new_dc_basename
 # ISO files to upload on vESXi datastores
 $isoPrefix = $config.architecture.iso_prefix
 $iso = $config.architecture.iso
-# Developer mode (Disable ping requests)
-$developerMode = $false
 
 # Enable/disable the vSan Configuration
 try {
@@ -69,15 +67,13 @@ Write-Host "== Physical ESXi Configuration ==" -ForegroundColor $DefaultColor
 # Add ESXi
 Write-Host "Configuring ESXi:" -ForegroundColor $DefaultColor
 $missing = @()
-if (!$developerMode) {
-    foreach ($e in $esxConfig) {
-        $oReturn = Test-Connection -computername $e.ip -Count 1 -quiet
-        if (!$oReturn) {
-            $missing += $e
-        }
-        # Wait to avoid overfilling the network
-        Start-Sleep -Milliseconds 300
+foreach ($e in $esxConfig) {
+    $oReturn = Test-Connection -computername $e.ip -Count 1 -quiet
+    if (!$oReturn) {
+        $missing += $e
     }
+    # Wait to avoid overfilling the network
+    Start-Sleep -Milliseconds 300
 }
 if ($missing.Count -gt 0) {
     Write-Host $missing.Count "ESXi are missing:" -ForegroundColor $ErrorColor
@@ -173,18 +169,16 @@ foreach ($e in $esxConfig) {
     }
 }
 $nbNewEsx--
-if (!$developerMode) {
-    Write-Host "Waiting the vESX" -ForegroundColor $DefaultColor
-    for ($i = 1; $i -le $nbNewEsx; $i++) {
-        $vesxIP = $vConfig.ip_base + ($vConfig.ip_offset + $i)
+Write-Host "Waiting the vESX" -ForegroundColor $DefaultColor
+for ($i = 1; $i -le $nbNewEsx; $i++) {
+    $vesxIP = $vConfig.ip_base + ($vConfig.ip_offset + $i)
+    $oReturn = Test-Connection -computername $vesxIP -Count 1 -quiet
+    while (!$oReturn) {
+        Start-Sleep -Seconds 20
         $oReturn = Test-Connection -computername $vesxIP -Count 1 -quiet
-        while (!$oReturn) {
-            Start-Sleep -Seconds 20
-            $oReturn = Test-Connection -computername $vesxIP -Count 1 -quiet
-        }
-        # Wait to avoid overfilling the network
-        Start-Sleep -Milliseconds 300
     }
+    # Wait to avoid overfilling the network
+    Start-Sleep -Milliseconds 300
 }
 Write-Host "Create datacenters for the vESXi" -ForegroundColor $DefaultColor
 if ($nbNewEsx % $nbEsxPerDC -eq 0) {
