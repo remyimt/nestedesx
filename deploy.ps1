@@ -6,7 +6,7 @@ $ErrorColor = "Red"
 
 Write-Host "Welcome ! My First PowerCLI Script:" -ForegroundColor  $DefaultColor
 
-Write-Host "Read the configuration file"
+Write-Host "Read the configuration file" -ForegroundColor $DefaultColor
 $config = Get-Content -Raw -Path configuration.json | ConvertFrom-Json
 
 # vSphere Account
@@ -114,13 +114,6 @@ Write-Host "== Virtualized ESXi Configuration ==" -ForegroundColor $DefaultColor
 # Create VM from OVF
 $nbNewEsx = 1
 foreach ($e in $esxConfig) {
-    try {
-        $cloneSrc = Get-VM -Name ($vConfig.basename + 1)
-        $createFromClone = $true
-    }
-    catch {
-        $createFromClone = $false
-    }
     for ($i = 0; $i -lt $e.nb_vesx; $i++) {
         # Compute the MAC address
         if ($nbNewEsx -lt 10) {
