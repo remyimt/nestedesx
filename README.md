@@ -288,5 +288,15 @@ home
 * Install SSH on tinyCore: https://iotbytes.wordpress.com/configure-ssh-server-on-microcore-tiny-linux/
 
 ### Troubleshooting
+#### Recurrent errors with PowerShell
 * PowerCLI error: Operation is not valid due to the current state of the object.
   * Quitter PowerShell et relancer PowerShell
+
+#### Connect to vCenter administration console
+* https://42.42.1.3:5480/login
+* Use the root account to login
+
+#### Connect to vCenter databases
+* ssh to the vCenter with the root account
+* `/opt/vmware/vpostgres/current/bin/psql -d VCDB -U postgres`
+

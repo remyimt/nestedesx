@@ -208,27 +208,27 @@ for ($i = 1; $i -le $nbNewEsx; $i++) {
     $vesxIP = $vConfig.ip_base + ($vConfig.ip_offset + $i)
     Write-Host ("Add vESXi {0} to {1}" -f $vesxIP, $dc.Name) -ForegroundColor $DefaultColor
     try {
-        $ip2obj[$e.ip] = Get-VMHost -Name $vesxIP -Location $dc
+        Get-VMHost -Name $vesxIP -Location $dc | Out-Null
         Write-Host ("vESXi {0} is already connected" -f $vesxIP) -ForegroundColor $DefaultColor
     }
     catch {
         Write-Host ("Add the host {0} to {1}" -f $vesxIP, $dc.Name) -ForegroundColor $DefaultColor
-        $ip2obj[$vesxIP] = Add-VMHost -Name $vesxIP -Location $dc -User $vConfig.user -Password $vConfig.pwd -Force
-        $ds = Get-Datastore -VMHost $ip2obj[$vesxIP]
+        $newEsx = Add-VMHost -Name $vesxIP -Location $dc -User $vConfig.user -Password $vConfig.pwd -Force
+        $ds = Get-Datastore -VMHost $newEsx
         $dsName = "vDatastore" + $i
         if ($ds.Count -gt 0) {
             if ($ds.Name -ne $dsName) {
                 Write-Host ("Removing the datastore of {0}" -f $vesxIP) -ForegroundColor $DefaultColor
-                Remove-Datastore -VMHost $ip2obj[$vesxIP] -Datastore $ds -Confirm:$false | Out-Null
+                Remove-Datastore -VMHost $newEsx -Datastore $ds -Confirm:$false | Out-Null
                 Write-Host ("Creating a new datastore for {0}" -f $vesxIP) -ForegroundColor $DefaultColor
-                New-Datastore -VMHost $ip2obj[$vesxIP] -Name $dsName -Path mpx.vmhba0:C0:T0:L0 -Vmfs -Confirm:$false | Out-Null
+                New-Datastore -VMHost $newEsx -Name $dsName -Path mpx.vmhba0:C0:T0:L0 -Vmfs -Confirm:$false | Out-Null
             }
         }
         elseif ($alwaysDatastore) {
             # Create a datastore from the smallest disk
             Write-Host ("Creating a new datastore for {0}" -f $vesxIP) -ForegroundColor $DefaultColor
-            $disks = Get-VMHostDisk -VMHost $ip2obj[$vesxIP] | Sort-Object -Property TotalSectors
-            New-Datastore -VMHost $ip2obj[$vesxIP] -Name $dsName -Path $disks[0].ScsiLun -Vmfs -Confirm:$false | Out-Null
+            $disks = Get-VMHostDisk -VMHost $newEsx | Sort-Object -Property TotalSectors
+            New-Datastore -VMHost $newEsx -Name $dsName -Path $disks[0].ScsiLun -Vmfs -Confirm:$false | Out-Null
         }
     }
 }
