@@ -46,6 +46,16 @@ catch [FormatException] {
     $alwaysDatastore = $false
 }
 
+$total = 0
+# Check the number of vESX to create
+foreach ($e in $esxConfig) {
+    $total += $e.nb_vesx
+}
+if ($total % $nbEsxPerDC -ne 0) {
+    Write-Host ("The vESXi can not be fairly distributed on datacenters. Total vESXi : {0}" -f $total) -ForegroundColor $ErrorColor
+    return
+}
+
 # Connection to vSphere
 Write-Host "Connecting to vSphere" -ForegroundColor $DefaultColor
 $oReturn = $false
@@ -112,9 +122,10 @@ foreach ($e in $esxConfig) {
 }
 Write-Host "== Virtualized ESXi Configuration ==" -ForegroundColor $DefaultColor
 # Create VM from OVF
-$nbNewEsx = 1
+$nbNewEsx = (Get-VM -Name "vesx*").Count + 1
 foreach ($e in $esxConfig) {
-    for ($i = 0; $i -lt $e.nb_vesx; $i++) {
+    $myESX = Get-VM -Name "vesx*" -Location $ip2obj[$e.ip]
+    for ($i = $myESX.Count; $i -lt $e.nb_vesx; $i++) {
         # Compute the MAC address
         if ($nbNewEsx -lt 10) {
             $macAddr = "00:50:56:a1:00:0" + $nbNewEsx
