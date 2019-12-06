@@ -4,8 +4,6 @@ $ErrorActionPreference = "Stop"
 $DefaultColor = "DarkGray"
 $ErrorColor = "Red"
 
-Write-Host "Welcome ! My First PowerCLI Script:" -ForegroundColor  $DefaultColor
-
 Write-Host "Read the configuration file" -ForegroundColor $DefaultColor
 $config = Get-Content -Raw -Path configuration.json | ConvertFrom-Json
 
@@ -46,15 +44,16 @@ catch [FormatException] {
     $alwaysDatastore = $false
 }
 
-$total = 0
+$totalVesx = 0
 # Check the number of vESX to create
 foreach ($e in $esxConfig) {
-    $total += $e.nb_vesx
+    $totalVesx += $e.nb_vesx
 }
-if ($total % $nbEsxPerDC -ne 0) {
-    Write-Host ("The vESXi can not be fairly distributed on datacenters. Total vESXi : {0}" -f $total) -ForegroundColor $ErrorColor
+if ($totalVesx % $nbEsxPerDC -ne 0) {
+    Write-Host ("The vESXi can not be fairly distributed on datacenters. Total vESXi : {0}" -f $totalVesx) -ForegroundColor $ErrorColor
     return
 }
+$totalDc = $totalVesx / $nbEsxPerDC
 
 # Connection to vSphere
 Write-Host "Connecting to vSphere" -ForegroundColor $DefaultColor
@@ -73,9 +72,9 @@ while (!$oReturn) {
         Start-Sleep -Seconds 20
     }
 }
-Write-Host "== Physical ESXi Configuration ==" -ForegroundColor $DefaultColor
-# Add ESXi
-Write-Host "Configuring ESXi:" -ForegroundColor $DefaultColor
+
+# Add ESXi to the main datacenter
+Write-Host "Configure the physical ESXi" -ForegroundColor $DefaultColor
 $missing = @()
 foreach ($e in $esxConfig) {
     $oReturn = Test-Connection -computername $e.ip -Count 1 -quiet
@@ -120,119 +119,206 @@ foreach ($e in $esxConfig) {
         $vmh = Get-VMHost -Name $vmh.Name
     }
 }
-Write-Host "== Virtualized ESXi Configuration ==" -ForegroundColor $DefaultColor
-# Create VM from OVF
-$nbNewEsx = (Get-VM -Name "vesx*").Count + 1
+
+# Power off ESXi VM (vESXi)
+Write-Host "Power off the useless vESXi" -ForegroundColor $DefaultColor
 foreach ($e in $esxConfig) {
-    $myESX = Get-VM -Name "vesx*" -Location $ip2obj[$e.ip]
-    for ($i = $myESX.Count; $i -lt $e.nb_vesx; $i++) {
-        # Compute the MAC address
-        if ($nbNewEsx -lt 10) {
-            $macAddr = "00:50:56:a1:00:0" + $nbNewEsx
+    $onVesx = Get-VM -Name "vesx*" -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" } | Sort-Object -Property "Name" -Descending
+    for ($i = 0; $i -lt ($onVesx.Count - $e.nb_vesx); $i++) {
+        # Remove the vESXi from the datacenter
+        Write-Host ("Disconnect the vESXi associated to {0}" -f $onVesx[$i]) -ForegroundColor $DefaultColor
+        $esxName = $onVesx[$i].Guest.IPAddress[0]
+        $esx = Get-VMHost -Name $esxName
+        $cl = Get-Cluster -VMHost $esx | Where-Object { $_.VsanEnabled }
+        if ($cl) {
+            Write-Host ("Disable vSan for the cluster {0}" -f $cl) -ForegroundColor $DefaultColor
+            Set-Cluster -Cluster $cl -VsanEnabled:$false -Confirm:$false
+        }
+        Write-Host ("Remove the vESXi {0} from the inventory" -f $esx) -ForegroundColor $DefaultColor
+        Set-VMHost -VMHost $esx -State "Maintenance" -Confirm:$false
+        Remove-VMHost -VMHost $esx -Confirm:$false
+        # Power off the VM
+        if ($onVesx.PowerState -eq "PoweredOn") {
+            Stop-VM -VM $onVesx[$i] -Confirm:$false | Out-Null
+        }
+    }
+}
+Write-Host "Delete unnecessary datacenters" -ForegroundColor $DefaultColor
+Get-Datacenter | Where-Object { (Get-VMHost -Location $_).Count -eq 0 } | Remove-Datacenter -Confirm:$false
+# Get the datacenters and compute the number of connected vESXi
+$dcs = Get-Datacenter -Name ($basenameDC + "*") | Select-Object Name, @{N = "Hosts#"; E = { @(Get-VMHost -Location $_ ).Count } } | Sort-Object -Property "Hosts#"
+if ($dcs.Count -gt $totalDc) {
+    # Too many datacenters exist
+    foreach ($dc in ($dcs | Select-Object -First ($dcs.Count - $totalDc))) {
+        Write-Host ("Delete the datacenter {0}" -f $dc) -ForegroundColor $DefaultColor
+        foreach ($esx in (Get-VMHost -Location $dc.Name)) {
+            Write-Host ("Remove the vESXi {0} from the inventory" -f $esx) -ForegroundColor $DefaultColor
+            Set-VMHost -VMHost $esx -State "Maintenance" -Confirm:$false
+            Remove-VMHost -VMHost $esx -Confirm:$false
+            # Power off the VM
+            if ($onVesx.PowerState -eq "PoweredOn") {
+                Stop-VM -VM $onVesx[$i] -Confirm:$false | Out-Null
+            }
+        }
+        Remove-Datacenter $dc.Name -Confirm:$false | Out-Null
+    }
+}
+
+# Compute available names and MAC addresses for vESXi creations
+$availableInfo = @()
+if ((Get-VM -Name "vesx*" | Where-Object { $_.PowerState -eq "PoweredOn" }).Count -lt $totalVesx) {
+    for ($i = 1; $i -le $vConfig.dhcp_max_ip; $i++) {
+        if ($i -lt 10) {
+            $NewEsxName = $vConfig.basename + "0" + $i
+            $macAddr = "00:50:56:a1:00:0" + $i
         }
         else {
-            $macAddr = "00:50:56:a1:00:" + $nbNewEsx
+            $NewEsxName = $vConfig.basename + $i
+            $macAddr = "00:50:56:a1:00:" + $i
         }
-        # Compute the vESXi name
-        $NewEsxName = $vConfig.basename + $nbNewEsx
-        # Retrieve the vESXi
         try {
-            $newEsx = Get-VM -Name $NewEsxName
+            $vesx = Get-VM -Name $NewEsxName
+            Write-Host ("Check the configuration of {0}" -f $vesx) -ForegroundColor $DefaultColor
             # Check the MAC address
-            $mac = Get-NetworkAdapter -VM $newEsx | Select-Object MacAddress
+            $mac = Get-NetworkAdapter -VM $vesx | Select-Object MacAddress
             if ($mac.MacAddress -ne $macAddr) {
                 Write-Host ("Wrong MAC address for {0}" -f $NewEsxName) -ForegroundColor $ErrorColor
                 Write-Host ("Please set the MAC address of the VM {0} to {1}" -f $NewEsxName, $macAddr) -ForegroundColor $ErrorColor
                 return
             }
-            # Check the host
-            if ($ip2obj[$e.ip] -ne (Get-VMHost -VM $newEsx)) {
-                Write-Host ("Wrong host for {0}" -f $NewEsxName) -ForegroundColor $ErrorColor
-                Write-Host ("Please set the host of the VM {0} to {1}" -f $NewEsxName, $ip2obj[$e.ip]) -ForegroundColor $ErrorColor
-            }
         }
         catch {
-            # Create the vESXi from OVF
-            Write-Host ("Creating the virtualized ESXi " + $NewEsxName) -ForegroundColor $DefaultColor
-            if ($createFromClone) {
-                $newEsx = New-VM -VM $cloneSrc -VMHost $ip2obj[$e.ip] -Name $NewEsxName -DiskStorageFormat Thin
-            }
-            else {
-                $newEsx = Import-vApp -Source $vEsxOVF -VMHost $ip2obj[$e.ip] -Name $NewEsxName -DiskStorageFormat Thin
-                $createFromClone = $true
-                $cloneSrc = $newEsx
-            }
-            # Set the MAC address
-            $newEsx | Get-NetworkAdapter | Set-NetworkAdapter -MacAddress $macAddr -Confirm:$false -StartConnected:$true | Out-Null
+            # The vESXi does not exist yet ! Compute information to this creation
+            $availableInfo += @{"name" = $NewEsxName; "mac" = $macAddr; "ip" = $vConfig.ip_base + ($vConfig.ip_offset + $i) }
         }
-        if ($newEsx.PowerState -eq "PoweredOff") {
-            Write-Host ("Power on the VM " + $NewEsxName) -ForegroundColor $DefaultColor
-            $newEsx | Start-VM | Out-Null
-        }
-        $nbNewEsx++
     }
 }
-$nbNewEsx--
-Write-Host "Waiting the vESX" -ForegroundColor $DefaultColor
-for ($i = 1; $i -le $nbNewEsx; $i++) {
-    $vesxIP = $vConfig.ip_base + ($vConfig.ip_offset + $i)
-    $oReturn = Test-Connection -computername $vesxIP -Count 1 -quiet
+# Index to use the VM information when creating new VM
+$availableIdx = 0
+
+# Create ESXi VM (vESXi) in the infrastructure
+foreach ($e in $esxConfig) {
+    $onVesx = Get-VM -Name "vesx*" -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" }
+    $offVesx = Get-VM -Name "vesx*" -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOff" } | Sort-Object
+    Write-Host ("Number of vESXi hosted on {0}: {1} / {2}" -f $e.ip, $onVesx.Count, $e.nb_vesx) -ForegroundColor $DefaultColor
+    if ($e.nb_vesx -gt $onVesx.Count -and $offVesx.Count -gt 0) {
+        # There are missing vESXi, start existing VM
+        Write-Host ("Start vESXi on {0}" -f $e.ip) -ForegroundColor $DefaultColor
+        $offVesx | Select-Object -First $e.nb_vesx | Start-VM -Confirm:$false | Out-Null
+    }
+    $onVesx = Get-VM -Name "vesx*" -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" }
+    for ($i = $onVesx.Count; $i -lt $e.nb_vesx; $i++, $availableIdx++) {
+        if ($availableIdx -gt $availableInfo.Count) {
+            Write-Host "No more IP available. Add new static IP in the DHCP and update 'dhcp_max_ip' in the configuration file!"
+            return
+        }
+        Write-Host ("Creating the virtualized ESXi " + $availableInfo[$availableIdx].name) -ForegroundColor $DefaultColor
+        if ($createFromClone) {
+            # Create the vESXi from an existing vESXi
+            $vesx = New-VM -VM $cloneSrc -VMHost $ip2obj[$e.ip] -Name $availableInfo[$availableIdx].name -DiskStorageFormat Thin
+        }
+        else {
+            # Create the vESXi from OVF
+            $vesx = Import-vApp -Source $vEsxOVF -VMHost $ip2obj[$e.ip] -Name $availableInfo[$availableIdx].name -DiskStorageFormat Thin
+            $createFromClone = $true
+            $cloneSrc = $vesx
+        }
+        # Set the MAC address
+        $vesx | Get-NetworkAdapter | Set-NetworkAdapter -MacAddress $availableInfo[$availableIdx].mac -Confirm:$false -StartConnected:$true | Out-Null
+        # Power on the vESXi
+        Write-Host ("Power on the VM " + $availableInfo[$availableIdx].name) -ForegroundColor $DefaultColor
+        $vesx | Start-VM | Out-Null
+        Start-Sleep -Seconds 1
+    }
+}
+
+$onVesx = Get-VM -Name "vesx*" | Where-Object { $_.PowerState -eq "PoweredOn" }
+Write-Host ("Check connection of {0} vESXi" -f $onVesx.Count) -ForegroundColor $DefaultColor
+$vesxNames = @()
+foreach ($vesx in $onVesx) {
+    $vesxIp = $vesx.Guest.IPAddress[0]
+    while (!$vesxIp) {
+        Write-Host ("Waiting the IP configuration of {0}" -f $vesx) -ForegroundColor $DefaultColor
+        Start-Sleep 10
+        $vesx = Get-VM -Name $vesx.Name
+        $vesxIp = $vesx.Guest.IPAddress[0]
+    }
+    $oReturn = Test-Connection -computername $vesxIp -Count 1 -quiet
     while (!$oReturn) {
         Start-Sleep -Seconds 20
-        $oReturn = Test-Connection -computername $vesxIP -Count 1 -quiet
+        $oReturn = Test-Connection -computername $vesxIp -Count 1 -quiet
+    }
+    try {
+        $vmh = Get-VMHost -Name $vesxIp
+        if ($vmh.ConnectionState -ne "Connected") {
+            Write-Host ("Please manually reconnect the host {0}" -f $vmh) -ForegroundColor $DefaultColor
+        }
+    }
+    catch {
+        $vesxNames += $vesxIp
     }
     # Wait to avoid overfilling the network
     Start-Sleep -Milliseconds 300
 }
-Write-Host "Create datacenters for the vESXi" -ForegroundColor $DefaultColor
-if ($nbNewEsx % $nbEsxPerDC -eq 0) {
-    $nbDC = $nbNewEsx / $nbEsxPerDC
-}
-else {
-    $nbDC = [math]::Truncate($nbNewEsx / $nbEsxPerDC) + 1
-}
-for ($i = 1; $i -le $nbDC; $i++) {
-    $dcName = $basenameDC + $i
-    try {
-        $dc = Get-Datacenter -Name $dcName
-        Write-Host ("Datacenter {0} already exists" -f $dcName) -ForegroundColor $DefaultColor
-    }
-    catch {
-        Write-Host ("Create a new datacenter" + $dcName) -ForegroundColor $DefaultColor
-        $folder = Get-Folder -NoRecursion
-        $dc = New-Datacenter -Location $folder -Name $dcName
-    }
-}
-Write-Host "Add vESXi to datacenters " -ForegroundColor $DefaultColor
-$dcNumber = 0
-for ($i = 1; $i -le $nbNewEsx; $i++) {
-    if (($i - 1) % $nbEsxPerDC -eq 0) {
-        $dc = Get-Datacenter -Name ($basenameDC + ++$dcNumber)
-    }
-    $vesxIP = $vConfig.ip_base + ($vConfig.ip_offset + $i)
-    Write-Host ("Add vESXi {0} to {1}" -f $vesxIP, $dc.Name) -ForegroundColor $DefaultColor
-    try {
-        Get-VMHost -Name $vesxIP -Location $dc | Out-Null
-        Write-Host ("vESXi {0} is already connected" -f $vesxIP) -ForegroundColor $DefaultColor
-    }
-    catch {
-        Write-Host ("Add the host {0} to {1}" -f $vesxIP, $dc.Name) -ForegroundColor $DefaultColor
-        $newEsx = Add-VMHost -Name $vesxIP -Location $dc -User $vConfig.user -Password $vConfig.pwd -Force
-        $ds = Get-Datastore -VMHost $newEsx
-        $dsName = "vDatastore" + $i
-        if ($ds.Count -gt 0) {
-            if ($ds.Name -ne $dsName) {
-                Write-Host ("Removing the datastore of {0}" -f $vesxIP) -ForegroundColor $DefaultColor
-                Remove-Datastore -VMHost $newEsx -Datastore $ds -Confirm:$false | Out-Null
-                Write-Host ("Creating a new datastore for {0}" -f $vesxIP) -ForegroundColor $DefaultColor
-                New-Datastore -VMHost $newEsx -Name $dsName -Path mpx.vmhba0:C0:T0:L0 -Vmfs -Confirm:$false | Out-Null
-            }
+Write-Host ("Available vESXi: ") -ForegroundColor $DefaultColor
+$vesxNames
+
+# Compute available names for datacenter creations
+Write-Host "Connect the vESXi to datacenters" -ForegroundColor $DefaultColor
+$dcs = Get-Datacenter -Name ($basenameDC + "*")
+$newDC = @()
+if ($dcs.Count -lt $totalDc) {
+    Write-Host "Create new datacenters" -ForegroundColor $DefaultColor
+    for ($i = 1; ($newDC.Count + $dcs.Count) -lt $totalDc; $i++) {
+        $dcName = $basenameDC + $i
+        try {
+            Get-Datacenter -Name $dcName | Out-Null
+            Write-Host ("Datacenter {0} already exists" -f $dcName) -ForegroundColor $DefaultColor
         }
-        elseif ($alwaysDatastore) {
-            # Create a datastore from the smallest disk
-            Write-Host ("Creating a new datastore for {0}" -f $vesxIP) -ForegroundColor $DefaultColor
-            $disks = Get-VMHostDisk -VMHost $newEsx | Sort-Object -Property TotalSectors
-            New-Datastore -VMHost $newEsx -Name $dsName -Path $disks[0].ScsiLun -Vmfs -Confirm:$false | Out-Null
+        catch {
+            Write-Host ("Create a new datacenter {0}" -f $dcName) -ForegroundColor $DefaultColor
+            $folder = Get-Folder -NoRecursion
+            $newDC += New-Datacenter -Location $folder -Name $dcName
+        }
+    }
+}
+
+# Assign vESXi to datacenters
+$availableIdx = 0
+foreach ($dc in Get-Datacenter -Name ($basenameDC + "*")) {
+    Write-Host ("Configure the datacenter {0}" -f $dc) -ForegroundColor $DefaultColor
+    $vesx = Get-VMHost -Location $dc
+    for ($i = $vesx.Count; $i -lt $nbEsxPerDC; $i++, $availableIdx++) {
+        # Connect vESXi to the datacenter
+        Write-Host ("Connect {0} to the {1}" -f $vesxNames[$availableIdx], $dc) -ForegroundColor $DefaultColor
+        $vmh = Add-VMHost -Name $vesxNames[$availableIdx] -Location $dc -User $vConfig.user -Password $vConfig.pwd -Force
+        # Check the datastore configuration
+        $ds = Get-Datastore -VMHost $vmh
+        $dsName = "vDatastore" + $vesxNames[$availableIdx].split(".")[3]
+        if ($ds.Count -gt 0 -and $ds[0].Name -ne $dsName) {
+            # Update the datastore ID to an unique ID
+            Write-Host ("Removing the datastore of {0}" -f $vmh) -ForegroundColor $DefaultColor
+            Remove-Datastore -VMHost $vmh -Datastore $ds[0] -Confirm:$false | Out-Null
+            Write-Host ("Creating a new datastore for {0}" -f $vmh) -ForegroundColor $DefaultColor
+            New-Datastore -VMHost $vmh -Name $dsName -Path mpx.vmhba0:C0:T0:L0 -Vmfs -Confirm:$false | Out-Null
+        }
+        #TODO Check if there is a cluster - if vSan is enabled, add the host to the cluster
+    }
+}
+
+# Create local datastore for vESXi
+if ($alwaysDatastore) {
+    foreach ($dc in Get-Datacenter -Name ($basenameDC + "*")) {
+        Write-Host ("Configure datastores for hosts on {0}" -f $dc) -ForegroundColor $DefaultColor
+        $vmh = Get-VMHost -Location $dc
+        foreach ($esx in $vmh) {
+            Write-Host ("Configuring the datastore of {0}" -f $esx) -ForegroundColor $DefaultColor
+            $ds = Get-Datastore -VMHost $esx
+            if ($ds.Count -eq 0) {
+                # Create a datastore from the smallest disk
+                $disks = Get-VMHostDisk -VMHost $esx | Sort-Object -Property TotalSectors
+                New-Datastore -VMHost $esx -Name ("vDatastore" + $esx.Name.Split(".")[3]) -Path $disks[0].ScsiLun -Vmfs -Confirm:$false | Out-Null
+            }
         }
     }
 }
@@ -273,10 +359,11 @@ if ($vSanMode) {
         }
         if (!$cl.VsanEnabled) {
             Write-Host ("Configuring the vSan for the cluster {0}" -f ("vSan" + $d.Name)) -ForegroundColor $DefaultColor
-            Set-Cluster -Cluster $cl -VsanEnabled:$true -Confirm:$false
+            Set-Cluster -Cluster $cl -VsanEnabled:$true -Confirm:$false | Out-Null
         }
     }
 }
+
 # Copy ISO files on datastores
 $ds = Get-Datastore -Name "vDatastore*"
 if ($iso.Count -gt 0 -and $ds.Count -gt 0) {
