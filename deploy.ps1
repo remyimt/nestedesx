@@ -164,6 +164,9 @@ if ($dcs.Count -gt $totalDc) {
     }
 }
 
+# Disable maintenance mode on vESXi
+Get-VMHost | Where-Object { $_.ConnectionState -eq "Maintenance" } | Set-VMHost -State "Connected"
+
 # Compute available names and MAC addresses for vESXi creations
 $availableInfo = @()
 if ((Get-VM -Name "vesx*" | Where-Object { $_.PowerState -eq "PoweredOn" }).Count -lt $totalVesx) {
@@ -251,7 +254,7 @@ foreach ($vesx in $onVesx) {
     try {
         $vmh = Get-VMHost -Name $vesxIp
         if ($vmh.ConnectionState -ne "Connected") {
-            Write-Host ("Please manually reconnect the host {0}" -f $vmh) -ForegroundColor $DefaultColor
+            Write-Host ("Please manually reconnect the host {0}" -f $vmh) -ForegroundColor $ErrorColor
         }
     }
     catch {
@@ -302,7 +305,6 @@ foreach ($dc in Get-Datacenter -Name ($basenameDC + "*")) {
             Write-Host ("Creating a new datastore for {0}" -f $vmh) -ForegroundColor $DefaultColor
             New-Datastore -VMHost $vmh -Name $dsName -Path mpx.vmhba0:C0:T0:L0 -Vmfs -Confirm:$false | Out-Null
         }
-        #TODO Check if there is a cluster - if vSan is enabled, add the host to the cluster
     }
 }
 
