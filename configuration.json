@@ -15,19 +15,19 @@
       "ip": "42.42.1.11",
       "user": "root",
       "pwd": "tototiti",
-      "nb_vesx": 0
+      "nb_vesx": 4
     },
     {
       "ip": "42.42.1.12",
       "user": "root",
       "pwd": "tototiti",
-      "nb_vesx": 3
+      "nb_vesx": 2
     },
     {
       "ip": "42.42.1.13",
       "user": "root",
       "pwd": "toTO12!!",
-      "nb_vesx": 3
+      "nb_vesx": 0
     }
   ],
   "virtual_esx": {
@@ -35,7 +35,8 @@
     "pwd": "superesx",
     "basename": "vesx",
     "ip_base": "42.42.1.",
-    "ip_offset": 20
+    "ip_offset": 20,
+    "dhcp_max_ip": 50
   },
   "architecture": {
     "main_dc": "SchoolDatacenter",
