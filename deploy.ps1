@@ -4,6 +4,34 @@ $ErrorActionPreference = "Stop"
 $DefaultColor = "DarkGray"
 $ErrorColor = "Red"
 
+#### Functions
+function Remove-HostFromDC {
+    param (
+        [VMware.VimAutomation.ViCore.Types.V1.Inventory.VMHost]
+        $esx
+    )
+    # Disable the vSan to remove the vSan datastore
+    $cl = Get-Cluster -VMHost $esx | Where-Object { $_.VsanEnabled }
+    if ($cl) {
+        Write-Host ("Disable vSan for the cluster {0}" -f $cl) -ForegroundColor $DefaultColor
+        Set-Cluster -Cluster $cl -VsanEnabled:$false -Confirm:$false
+    }
+    Write-Host ("Remove the vESXi {0} from the inventory" -f $esx) -ForegroundColor $DefaultColor
+    Set-VMHost -VMHost $esx -State "Maintenance" -Confirm:$false | Out-Null
+    Remove-VMHost -VMHost $esx -Confirm:$false
+    Write-Host ("Power off the VM associated to the host {0}" -f $esx) -ForegroundColor $DefaultColor
+    # Compute the VM name
+    $nb = $esx.Name.split(".")[3] - $vConfig.ip_offset
+    if ($nb -lt 10) {
+        $vmName = $vConfig.basename + "0" + $nb
+    }
+    else {
+        $vmName = $vConfig.basename + $nb
+    }
+    Get-VM -Name $vmName | Stop-VM -Confirm:$false | Out-Null
+}
+#### End of Functions
+
 Write-Host "Read the configuration file" -ForegroundColor $DefaultColor
 $config = Get-Content -Raw -Path configuration.json | ConvertFrom-Json
 
@@ -128,39 +156,34 @@ foreach ($e in $esxConfig) {
         # Remove the vESXi from the datacenter
         Write-Host ("Disconnect the vESXi associated to {0}" -f $onVesx[$i]) -ForegroundColor $DefaultColor
         $esxName = $onVesx[$i].Guest.IPAddress[0]
-        $esx = Get-VMHost -Name $esxName
-        $cl = Get-Cluster -VMHost $esx | Where-Object { $_.VsanEnabled }
-        if ($cl) {
-            Write-Host ("Disable vSan for the cluster {0}" -f $cl) -ForegroundColor $DefaultColor
-            Set-Cluster -Cluster $cl -VsanEnabled:$false -Confirm:$false
-        }
-        Write-Host ("Remove the vESXi {0} from the inventory" -f $esx) -ForegroundColor $DefaultColor
-        Set-VMHost -VMHost $esx -State "Maintenance" -Confirm:$false
-        Remove-VMHost -VMHost $esx -Confirm:$false
-        # Power off the VM
-        if ($onVesx.PowerState -eq "PoweredOn") {
-            Stop-VM -VM $onVesx[$i] -Confirm:$false | Out-Null
-        }
+        Remove-HostFromDC(Get-VMHost -Name $esxName)
     }
 }
+
 Write-Host "Delete unnecessary datacenters" -ForegroundColor $DefaultColor
+# Remove empty datacenters
 Get-Datacenter | Where-Object { (Get-VMHost -Location $_).Count -eq 0 } | Remove-Datacenter -Confirm:$false
 # Get the datacenters and compute the number of connected vESXi
 $dcs = Get-Datacenter -Name ($basenameDC + "*") | Select-Object Name, @{N = "Hosts#"; E = { @(Get-VMHost -Location $_ ).Count } } | Sort-Object -Property "Hosts#"
+# Remove unnecessary datacenters
 if ($dcs.Count -gt $totalDc) {
     # Too many datacenters exist
     foreach ($dc in ($dcs | Select-Object -First ($dcs.Count - $totalDc))) {
         Write-Host ("Delete the datacenter {0}" -f $dc) -ForegroundColor $DefaultColor
         foreach ($esx in (Get-VMHost -Location $dc.Name)) {
-            Write-Host ("Remove the vESXi {0} from the inventory" -f $esx) -ForegroundColor $DefaultColor
-            Set-VMHost -VMHost $esx -State "Maintenance" -Confirm:$false
-            Remove-VMHost -VMHost $esx -Confirm:$false
-            # Power off the VM
-            if ($onVesx.PowerState -eq "PoweredOn") {
-                Stop-VM -VM $onVesx[$i] -Confirm:$false | Out-Null
-            }
+            Remove-HostFromDC($esx)
         }
         Remove-Datacenter $dc.Name -Confirm:$false | Out-Null
+    }
+}
+
+# Check the number of vESXi on every datacenter
+Write-Host "Remove hosts on overload datacenters" -ForegroundColor $DefaultColor
+$dcs = Get-Datacenter -Name ($basenameDC + "*")
+foreach ($dc in $dcs) {
+    $hosts = Get-VMHost -Location $dc | Sort-Object -Descending
+    for ($i = 0; $i -lt ($hosts.Count - $nbEsxPerDC); $i++) {
+        Remove-HostFromDC($hosts[$i])
     }
 }
 
@@ -362,6 +385,13 @@ if ($vSanMode) {
         if (!$cl.VsanEnabled) {
             Write-Host ("Configuring the vSan for the cluster {0}" -f ("vSan" + $d.Name)) -ForegroundColor $DefaultColor
             Set-Cluster -Cluster $cl -VsanEnabled:$true -Confirm:$false | Out-Null
+            # Get the number at the end of the cluster name
+            $cl.Name -match "(\d+)$" | Out-Null
+            $dsName = "vsanDatastore" + $Matches[1]
+            # Rename the datastore
+            if ($cl.Name -ne $dsName) {
+                $cl | Get-Datastore -Name "vsan*" | Set-Datastore -Name $dsName | Out-Null
+            }
         }
     }
 }
