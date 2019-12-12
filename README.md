@@ -55,10 +55,17 @@ corriger les problèmes d'affichage, par exemple, des propriétés de la VM :
 * Modifier les mots de passe du fichier *embedded_vCSA_on_ESXi.json* et les reporter dans le fichier *configuration.json*
 * **ATTENTION**: Dans les fichiers *embedded_vCSA_on_ESXi.json* et *configuration.json* tous les mots de passe sont en clair !
 * Monter l'image sur le poste d'installation (Windows, Linux ou Mac) et lancer l'installeur en précisant le chemin vers le fichier *embedded_vCSA_on_ESXi.json*
+##### Sous Linux (Ubuntu 18.04)
 ```
 mkdir /tmp/vcsa
 sudo mount -o loop VMware-VCSA-all-6.7.0-10244745.iso /tmp/vcsa
 cd /tmp/vcsa/vcsa-cli-installer/lin64/
+./vcsa-deploy install --accept-eula --no-ssl-certificate-verification ./Files/embedded_vCSA_on_ESXi.json
+```
+##### Sous MacOS
+```
+hdiutil mount vmware-VCSA-all-6.7.0-10244745.iso
+cd /Volumes/VMware\ VCSA/vcsa-cli-installer/mac/
 ./vcsa-deploy install --accept-eula --no-ssl-certificate-verification ./Files/embedded_vCSA_on_ESXi.json
 ```
 
@@ -70,26 +77,39 @@ cd /tmp/vcsa/vcsa-cli-installer/lin64/
 #### Déploiement de l'infrastructure virtuelle
 ##### Installation de PowerCLI sur le poste d'installation
 * PowerShell
+##### Sous Linux (Ubuntu 18.04)
 ```
+# Add the Microsoft repository
 curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
 curl https://packages.microsoft.com/config/ubuntu/16.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
+# Add the old Ubuntu repository to install the library libicu55
+sudo add-apt-repository "deb http://security.ubuntu.com/ubuntu xenial-security main"
+# Install PowerShell
 sudo apt-get update
 sudo apt-get install -y powershell
+```
+##### Sous MacOS
+```
+brew cask install powershell
 ```
 * PowerCLI
 ```
 Install-Module -Name VMware.PowerCLI -Scope CurrentUser
 Update-Module -Name VMware.PowerCLI
+# Do not participate to the Customer Experience Improvement Program
+Set-PowerCLIConfiguration -Scope User -ParticipateInCEIP $false
+# Do not use SSL connections
+Set-PowerCLIConfiguration -InvalidCertificateAction Ignore -Confirm:$false
 ```
 
-##### Déploiement des VM à partir de PowerCLI
+##### Déploiement et configuration des VM 
 * Le fichier de configuration *configuration.json* est utilisé par le script *deploy.ps1*. Éditer le fichier de
 configuration afin de vérifier les informations. Pour plus de précision sur ce fichier, se reporter à
 [cette section](#le-fichier-de-configuration)
-* Lancer le shell PowerShell
+* Lancer le shell PowerShell : `pwsh`
 * Lancer le script de déploiement : `./deploy.ps1`
 
-##### Création d'utilisateurs ayant accès à un seul centre de données
+##### Création d'utilisateurs ayant un accès restreint
 * Créer un nouvel utilisateur par centre de données commençant par *new_dc_basename*, c.-à-d., les centres de données
 créés pour les étudiants. Le nom des utilisateurs doivent être *user_basename* suivi du numéro de création. Par
 exemple, si *user_basename* est "adminDC", les utilisateurs seront : adminDC1, adminDC2, adminDC3, adminDC4, etc.
