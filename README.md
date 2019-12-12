@@ -125,9 +125,12 @@ de vESXi (ESXi installés dans des VM) hébergés par chaque ESXi (physique).
   cette base suivie d'un chiffre.
   * *ip_base* : Trois premiers nombres de l'adresse IP des VM des vESXi
   * *ip_offset* : Début du dernier nombre de l'adresse IP des VM des vESXi. Ce nombre est incrémenté de 1 à chaque création de VM.
-* Exemple de calcul d'IP
+  * *dhcp_max_ip* : Nombre d'IP statiques configurées dans le serveur DHCP pour les vESXi
+  * **NOTE**: la configuration des IP des vESXi est gérée par le switch. Les derniers champs sont donc à modifier si la configuration IP du DHCP est modifiée. 
+* Exemple de calcul d'IP d'un vESXi
   * *ip_base* : *42.42.1.*
   * *ip_offset* : *40*
+  * On concatène les deux valeurs (42.42.1.40) puis on incrémente à chaque création de VM
   * La 1ère VM créée (premier vESXi) aura pour IP *42.42.1.41*, la 2e VM aura pour IP *42.42.1.42*, la 13e aura pour IP *42.42.1.53*
 
 #### La section *architecture* (obligatoire)
@@ -140,7 +143,7 @@ de vESXi (ESXi installés dans des VM) hébergés par chaque ESXi (physique).
   * *nb_vesx_datacenter* : Nombre de datacenter contenant des vESXi
   * *vsan* : Ajouter et configurer des clusters vSan dans chaque nouveau datacenter
   * *always_datastore* : Créer un datastore à partir du disque le plus petit **si le vESXi n'en possède pas**.
-  Si vSan est activé, deux datastores seront présents sur chaque vESXi.
+  Si vSan est activé, deux datastores pourront être présents sur chaque vESXi.
   * *ovf* : l'OVF à déployer pour la création des vESXi
   * *iso_prefix* : Répertoire contenant les images ISO à copier sur le datastore des vESXi.
   **ATTENTION** il n'est pas possible de copier une image ISO sur un datastore de type vSan. **Le chemin DOIT finir par un /"**
