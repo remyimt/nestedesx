@@ -33,6 +33,13 @@ La clé USB est créée avec Rufus.
 * *tp-ha.txt* : TP sur vSphere HA
 * *tp-vcenter* : TP sur les bases du vCenter
 
+### Configuration du Switch en mode LAN Only
+* Se connecter à l'interface d'administration du switch
+* Advanced Settings > VLAN
+* Décocher le "WAN Port" du VLAN 2 > Ok
+* Cocher le "WAN Port" du VLAN 1 > Ok
+* Cliquer sur "Save" et attendre le redémarrage du switch
+
 ### Installation et déploiement de l'infrastructure
 #### Installation des ESXi
 * Créer une clé USB d'installation avec Rufus (sous Windows) à partir d'une
