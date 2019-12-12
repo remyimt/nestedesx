@@ -33,7 +33,7 @@ La clé USB est créée avec Rufus.
 * *tp-ha.txt* : TP sur vSphere HA
 * *tp-vcenter* : TP sur les bases du vCenter
 
-### Détails sur l'installation de l'infrastructure
+### Installation et déploiement de l'infrastructure
 #### Installation des ESXi
 * Créer une clé USB d'installation avec Rufus (sous Windows) à partir d'une
 image ISO VMvisor [VMware-VMvisor-Installer-6.5.0.update02-8294253.x86_64.iso]
@@ -67,7 +67,7 @@ cd /tmp/vcsa/vcsa-cli-installer/lin64/
   * `sudo apt install libgconf2-4`
 * En cas de bug de l'installeur graphique, effacer le répertoire ~/.config/Installer
 
-#### Création de l'infrastructure virtuelle
+#### Déploiement de l'infrastructure virtuelle
 ##### Installation de PowerCLI sur le poste d'installation
 * PowerShell
 ```
@@ -82,17 +82,25 @@ Install-Module -Name VMware.PowerCLI -Scope CurrentUser
 Update-Module -Name VMware.PowerCLI
 ```
 
-##### Déploiement de l'infrastructure virtuelle
+##### Déploiement des VM à partir de PowerCLI
 * Le fichier de configuration *configuration.json* est utilisé par le script *deploy.ps1*. Éditer le fichier de
 configuration afin de vérifier les informations. Pour plus de précision sur ce fichier, se reporter à
 [cette section](#le-fichier-de-configuration)
 * Lancer le shell PowerShell
 * Lancer le script de déploiement : `./deploy.ps1`
+
+##### Création d'utilisateurs ayant accès à un seul centre de données
 * Créer un nouvel utilisateur par centre de données commençant par *new_dc_basename*, c.-à-d., les centres de données
 créés pour les étudiants. Le nom des utilisateurs doivent être *user_basename* suivi du numéro de création. Par
 exemple, si *user_basename* est "adminDC", les utilisateurs seront : adminDC1, adminDC2, adminDC3, adminDC4, etc.
 Les valeurs *new_dc_basename* et *user_basename* sont définis dans le fichier de configuration.
+* À partir de l'interface du client vSphere, créer un nouvel utilisateur
+  * Menu > Administration
+  * Single Sign On > Users and Groups
+  * Domain: vsphere.local > Add user
+  * Username: adminG1, Password: adminG1$$
 * Lancer le script configurant les permissions des nouveaux utilisateurs : `./set-permissions.ps1`
+* L'infrastructure est prête
 
 ### Le fichier de configuration
 * **ATTENTION** Tous les comptes et mots de passe sont définis dans le fichier de configuration.
@@ -255,17 +263,6 @@ home
   * `cat ~/.ssh/id_rsa.pub | ssh root@192.x.x.x 'cat >> /etc/ssh/keys-root/authorized_keys'`
 * Utiliser le script *stop.sh* pour éteindre le cluster
 * Ne pas oublier d'éteindre le switch ;)
-
-### Création d'utilisateurs ayant accès à un seul centre de données
-* À partir de l'interface du client vSphere, créer un nouvel utilisateur
-  * Menu > Administration
-  * Single Sign On > Users and Groups
-  * Domain: vsphere.local > Add user
-  * Username: adminG1, Password: adminG1$$
-* Attribuer l'utilisateur à un centre de données
-  * Menu > Home > Hosts and clusters
-  * Select the datacenter > Permissions
-  * Add > User: vsphere.local, search for "adminG1", Role: Administrator, tick "Propagate to children"
 
 ### Mise en place du vSan via l'interface graphique du vCenter
 * Les 3 vESXi sont déjà dans un datacenter
