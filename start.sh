@@ -2,6 +2,7 @@
 host=$(grep "vcenter" -A 5 configuration.json | grep host | sed  's:.*"\(.*\)",:\1:')
 vcenter=$(grep "vcenter" -A 5 configuration.json | grep ip | sed  's:.*"\(.*\)",:\1:')
 numberRegEx="^[0-9]+$"
+HTML_FILE="vcenter.html"
 
 echo "Waiting ESXi $host"
 ping -c 1 -W 3 $host
@@ -30,5 +31,16 @@ while [ $result -ne 0 ]; do
   ping -c 1 -W 3 $vcenter
   result=$?
 done
+echo "Waiting for the vSphere web service"
+wget https://$vcenter/ui/ --no-check-certificate -O $HTML_FILE &> /dev/null
+res=$(grep "initializing" $HTML_FILE)
+while [ ! -z "$res" ]; do
+  echo "Waiting for the web service"
+  sleep 30
+  wget https://$vcenter/ui/ --no-check-certificate -O $HTML_FILE &> /dev/null
+  res=$(grep "initializing" $HTML_FILE)
+done
+rm $HTML_FILE
+
 echo "Starting the NUC cluster"
 pwsh -File ./deploy.ps1
