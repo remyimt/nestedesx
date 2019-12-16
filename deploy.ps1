@@ -413,6 +413,11 @@ if ($vSanMode) {
         }
     }
 }
+else {
+    # Disable vSan clusters
+    Write-Host "Disable vSan mode on clusters" -ForegroundColor $DefaultColor
+    Get-Cluster | Where-Object { $_.VsanEnabled } | Set-Cluster -VsanEnabled:$false -Confirm:$false
+}
 
 # Copy ISO files on datastores
 $ds = Get-Datastore -Name "vDatastore*"
