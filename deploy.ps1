@@ -5,6 +5,15 @@ $DefaultColor = "DarkGray"
 $ErrorColor = "Red"
 
 #### Functions
+function Wait-Hosts {
+    foreach ($vmh in (Get-VMHost | Where-Object { $_.ConnectionState -ne "Connected" })) {
+        while ($vmh.ConnectionState -ne "Connected") {
+            Write-Host ("Waiting the host {0} (State: {1})" -f $vmh, $vmh.ConnectionState)
+            Start-Sleep -Seconds 20
+            $vmh = Get-VMHost $vmh.Name
+        }
+    }
+}
 function Remove-HostFromDC {
     param (
         [VMware.VimAutomation.ViCore.Types.V1.Inventory.VMHost]
@@ -59,14 +68,14 @@ $iso = $config.architecture.iso
 
 # Enable/disable the vSan Configuration
 try {
-    $vSanMode = [System.Convert]::ToBoolean($config.architecture.vsan) 
+    $vSanMode = [System.Convert]::ToBoolean($config.architecture.vsan)
 }
 catch [FormatException] {
     $vSanMode = $false
 }
 # Add a default datastore to ESXi without datastore
 try {
-    $alwaysDatastore = [System.Convert]::ToBoolean($config.architecture.always_datastore) 
+    $alwaysDatastore = [System.Convert]::ToBoolean($config.architecture.always_datastore)
 }
 catch [FormatException] {
     $alwaysDatastore = $false
@@ -276,9 +285,6 @@ foreach ($vesx in $onVesx) {
     }
     try {
         $vmh = Get-VMHost -Name $vesxIp
-        if ($vmh.ConnectionState -ne "Connected") {
-            Write-Host ("Please manually reconnect the host {0}" -f $vmh) -ForegroundColor $ErrorColor
-        }
     }
     catch {
         $vesxNames += $vesxIp
@@ -288,6 +294,8 @@ foreach ($vesx in $onVesx) {
 }
 Write-Host ("Available vESXi: ") -ForegroundColor $DefaultColor
 $vesxNames
+
+Wait-Hosts
 
 # Compute available names for datacenter creations
 Write-Host "Connect the vESXi to datacenters" -ForegroundColor $DefaultColor
@@ -308,6 +316,8 @@ if ($dcs.Count -lt $totalDc) {
         }
     }
 }
+
+Wait-Hosts
 
 # Assign vESXi to datacenters
 $availableIdx = 0
@@ -371,10 +381,18 @@ if ($vSanMode) {
             $na = Get-VMHostNetworkAdapter -VMHost $vmh -VMKernel | Where-Object { ! $_.VsanTrafficEnabled }
             $na | Set-VMHostNetworkAdapter -VsanTrafficEnabled $true -Confirm:$false | Out-Null
             $dataDisk = $vmh | Get-VMHostDisk | Where-Object { $_.TotalSectors -eq 83886080 }
-            if ($dataDisk.ScsiLun.VsanStatus -eq "Eligible") {
-                Write-Host "Configuring disks" -ForegroundColor $DefaultColor
-                $cacheDisk = $vmh | Get-VMHostDisk | Where-Object { $_.TotalSectors -eq 20971520 }
-                # Use RunAsync to run this task in order to avoid weird error (bug ?)
+            Write-Host "Configuring disks" -ForegroundColor $DefaultColor
+            $cacheDisk = $vmh | Get-VMHostDisk | Where-Object { $_.TotalSectors -eq 20971520 }
+            if (!$cacheDisk.ScsiLun.IsSsd) {
+                Write-Host ("Mark the disk {0} as a SSD Disk" -f $cacheDisk) -ForegroundColor $DefaultColor
+                $cli = Get-EsxCli -VMHost $vmh
+                $sat = ($cli.storage.nmp.device.list() | Where-Object { $_.Device -eq $cacheDisk.ScsiLun.CanonicalName }).StorageArrayType
+                $cli.storage.nmp.satp.rule.add($null, $null, $null, $cacheDisk.ScsiLun.CanonicalName, $null, $null, $null, "enable_ssd", $null, $null, $sat, $null, $null, $null) | Out-Null
+                $cli.storage.core.claiming.reclaim($cacheDisk.ScsiLun.CanonicalName) | Out-Null
+            }
+            # Use RunAsync to run this task in order to avoid weird error (bug ?)
+            $diskGroup = Get-VsanDiskGroup -VMHost $vmh
+            if ($diskGroup.Count -eq 0) {
                 $task = New-VsanDiskGroup -VMHost $vmh -DataDiskCanonicalName $dataDisk -SsdCanonicalName $cacheDisk -RunAsync
                 while ($task.state -eq "Running") {
                     Start-Sleep -Seconds 10
@@ -403,7 +421,7 @@ if ($iso.Count -gt 0 -and $ds.Count -gt 0) {
     # DatastoreId = full_path - Use the full path to mount the ISO file
     $id2path = @{ }
     $firstSt, $otherSt = $ds
-    foreach ($isoFile in $iso) {    
+    foreach ($isoFile in $iso) {
         Write-Host ("Looking for {0} on datastore {1}" -f $isoFile, $firstSt.Name) -ForegroundColor $DefaultColor
         $myFile = Get-ChildItem -Path $firstSt.DatastoreBrowserPath | Where-Object { $_.Name -like $isoFile }
         if ($myFile.Count -eq 0) {
