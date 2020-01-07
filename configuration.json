@@ -1,49 +1,60 @@
 {
   "switch": {
-    "user": "admin",
-    "pwd": "admin",
-    "wifi_key": "fortytwo"
+    "user": "cisco",
+    "pwd": "swB219!!",
+    "wifi_key": "VMwareCestFacile"
   },
   "vcenter": {
-    "ip": "42.42.1.3",
-    "host": "42.42.1.13",
+    "ip": "42.42.4.4",
+    "host": "42.42.4.2",
     "user": "administrator@vsphere.local",
     "pwd": "tiTI12**"
   },
   "physical_esx": [
     {
-      "ip": "42.42.1.11",
+      "ip": "42.42.1.2",
       "user": "root",
       "pwd": "tototiti",
-      "nb_vesx": 4
+      "dhcp_mac_addr": "00:50:56:a1:01:",
+      "dhcp_max_addr": 10,
+      "nb_vesx": 1
     },
     {
-      "ip": "42.42.1.12",
+      "ip": "42.42.2.2",
       "user": "root",
       "pwd": "tototiti",
-      "nb_vesx": 2
+      "dhcp_mac_addr": "00:50:56:a1:02:",
+      "dhcp_max_addr": 10,
+      "nb_vesx": 1
     },
     {
-      "ip": "42.42.1.13",
+      "ip": "42.42.3.2",
       "user": "root",
-      "pwd": "toTO12!!",
+      "pwd": "tototiti",
+      "dhcp_mac_addr": "00:50:56:a1:03:",
+      "dhcp_max_addr": 10,
+      "nb_vesx": 1
+    },
+    {
+      "ip": "42.42.4.2",
+      "user": "root",
+      "pwd": "tototiti",
+      "dhcp_mac_addr": "00:50:56:a1:04:",
+      "dhcp_max_addr": 10,
       "nb_vesx": 0
     }
   ],
   "virtual_esx": {
     "user": "root",
     "pwd": "superesx",
-    "basename": "vesx",
-    "ip_base": "42.42.1.",
-    "ip_offset": 20,
-    "dhcp_max_ip": 50
+    "basename": "vesx"
   },
   "architecture": {
     "main_dc": "SchoolDatacenter",
     "new_dc_basename": "StudentDC",
     "user_basename": "adminDC",
     "nb_vesx_datacenter": 3,
-    "vsan": "true",
+    "vsan": "false",
     "always_datastore": "true",
     "ovf": "./Files/vesxtp-ovf/vesx-tp.ovf",
     "iso_prefix": "./Files/",
