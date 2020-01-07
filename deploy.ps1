@@ -14,6 +14,27 @@ function Wait-Hosts {
         }
     }
 }
+
+# Copy this function to the file set-permissions.ps1
+function NameFromMAC {
+    param (
+        [string]
+        $macAddr
+    )
+    $array = $macAddr.Split(":")
+    return $vConfig.basename + $array[4] + "_" + $array[5]
+}
+function Get-VMFromHost {
+    param (
+        [VMware.VimAutomation.ViCore.Types.V1.Inventory.VMHost]
+        $esx
+    )
+    # Retrieve the MAC address of the host to compute the VM name
+    $mac = $esx | Get-VMHostNetworkAdapter | Select-Object -Property Mac
+    $vmName = NameFromMAC($mac[0].Mac)
+    return Get-VM -Name $vmName
+}
+
 function Remove-HostFromDC {
     param (
         [VMware.VimAutomation.ViCore.Types.V1.Inventory.VMHost]
@@ -24,20 +45,17 @@ function Remove-HostFromDC {
     if ($cl) {
         Write-Host ("Disable vSan for the cluster {0}" -f $cl) -ForegroundColor $DefaultColor
         Set-Cluster -Cluster $cl -VsanEnabled:$false -Confirm:$false
+        # Wait the end of the vSan configuration
+        Start-Sleep -Seconds 2
     }
+    # Get the associated VM
+    $vm = Get-VMFromHost($esx)
+    # Delete the host and poweroff the VM
     Write-Host ("Remove the vESXi {0} from the inventory" -f $esx) -ForegroundColor $DefaultColor
     Set-VMHost -VMHost $esx -State "Maintenance" -Confirm:$false | Out-Null
-    Remove-VMHost -VMHost $esx -Confirm:$false
+    Remove-VMHost -VMHost $esx -Confirm:$false | Out-Null
     Write-Host ("Power off the VM associated to the host {0}" -f $esx) -ForegroundColor $DefaultColor
-    # Compute the VM name
-    $nb = $esx.Name.split(".")[3] - $vConfig.ip_offset
-    if ($nb -lt 10) {
-        $vmName = $vConfig.basename + "0" + $nb
-    }
-    else {
-        $vmName = $vConfig.basename + $nb
-    }
-    Get-VM -Name $vmName | Stop-VM -Confirm:$false | Out-Null
+    $vm | Stop-VM -Confirm:$false | Out-Null
 }
 #### End of Functions
 
@@ -73,7 +91,7 @@ try {
 catch [FormatException] {
     $vSanMode = $false
 }
-# Add a default datastore to ESXi without datastore
+# Add a default datastore to ESXi without datastore (true/false)
 try {
     $alwaysDatastore = [System.Convert]::ToBoolean($config.architecture.always_datastore)
 }
@@ -82,8 +100,19 @@ catch [FormatException] {
 }
 
 $totalVesx = 0
-# Check the number of vESX to create
+# Check the vESXi information from the configuration file
+if ($vSanMode) {
+    if ($nbEsxPerDC -lt 3) {
+        Write-Host("The minimum number of ESXi in vSan clusters is 3. Please, disable the vSan mode or increase the number of vESX per datacenter (nb_vesx_datacenter)") -ForegroundColor $ErrorColor
+        return
+    }
+}
 foreach ($e in $esxConfig) {
+    if ($e.nb_vesx -ge $e.dhcp_max_addr) {
+        Write-Host ("The number of vESXi ({0}) of the pESXi {1} can not be greater than the number of DHCP addresses ({2}).
+        Please check your configuration file." -f $e.nb_vesx, $e.ip, $e.dhcp_max_addr) -ForegroundColor $ErrorColor
+        return
+    }
     $totalVesx += $e.nb_vesx
 }
 if ($totalVesx % $nbEsxPerDC -ne 0) {
@@ -157,6 +186,20 @@ foreach ($e in $esxConfig) {
     }
 }
 
+# Delete ESXi VM with issues (i.e., vESXi hosts with a vSanDatastore that does not belong to a vSan cluster)
+Write-Host "Delete vESXi with configuration issues" -ForegroundColor $DefaultColor
+# Get the datastores that do not belong to a vSan cluster
+$dsWithIssues = Get-Datastore -Name "vsan*" | Where-Object { (Get-Cluster -Name "vsan*" | Get-Datastore) -CNotContains $_ }
+if ($dsWithIssues.Count -gt 0) {
+    # Disconnect the hosts using these datastores from their datacenter
+    foreach ($vmh in (Get-VMHost -Datastore $dsWithIssues)) {
+        $vm = Get-VMFromHost($vmh)
+        Write-Host("Configuration issue detected: Remove the host {0} and delete the VM {1}" -f $vmh, $vm) -ForegroundColor $DefaultColor
+        $vmh | Remove-VMHost -Confirm:$false
+        # Delete associated VM
+        $vm | Stop-VM -Confirm:$false | Remove-VM -DeletePermanently -Confirm:$false | Out-Null
+    }
+}
 # Power off ESXi VM (vESXi)
 Write-Host "Power off the useless vESXi" -ForegroundColor $DefaultColor
 foreach ($e in $esxConfig) {
@@ -199,38 +242,6 @@ foreach ($dc in $dcs) {
 # Disable maintenance mode on vESXi
 Get-VMHost | Where-Object { $_.ConnectionState -eq "Maintenance" } | Set-VMHost -State "Connected"
 
-# Compute available names and MAC addresses for vESXi creations
-$availableInfo = @()
-if ((Get-VM -Name "vesx*" | Where-Object { $_.PowerState -eq "PoweredOn" }).Count -lt $totalVesx) {
-    for ($i = 1; $i -le $vConfig.dhcp_max_ip; $i++) {
-        if ($i -lt 10) {
-            $NewEsxName = $vConfig.basename + "0" + $i
-            $macAddr = "00:50:56:a1:00:0" + $i
-        }
-        else {
-            $NewEsxName = $vConfig.basename + $i
-            $macAddr = "00:50:56:a1:00:" + $i
-        }
-        try {
-            $vesx = Get-VM -Name $NewEsxName
-            Write-Host ("Check the configuration of {0}" -f $vesx) -ForegroundColor $DefaultColor
-            # Check the MAC address
-            $mac = Get-NetworkAdapter -VM $vesx | Select-Object MacAddress
-            if ($mac.MacAddress -ne $macAddr) {
-                Write-Host ("Wrong MAC address for {0}" -f $NewEsxName) -ForegroundColor $ErrorColor
-                Write-Host ("Please set the MAC address of the VM {0} to {1}" -f $NewEsxName, $macAddr) -ForegroundColor $ErrorColor
-                return
-            }
-        }
-        catch {
-            # The vESXi does not exist yet ! Compute information to this creation
-            $availableInfo += @{"name" = $NewEsxName; "mac" = $macAddr; "ip" = $vConfig.ip_base + ($vConfig.ip_offset + $i) }
-        }
-    }
-}
-# Index to use the VM information when creating new VM
-$availableIdx = 0
-
 # Create ESXi VM (vESXi) in the infrastructure
 foreach ($e in $esxConfig) {
     $onVesx = Get-VM -Name "vesx*" -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" }
@@ -242,34 +253,49 @@ foreach ($e in $esxConfig) {
         $offVesx | Select-Object -First $e.nb_vesx | Start-VM -Confirm:$false | Out-Null
     }
     $onVesx = Get-VM -Name "vesx*" -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" }
-    for ($i = $onVesx.Count; $i -lt $e.nb_vesx; $i++, $availableIdx++) {
-        if ($availableIdx -gt $availableInfo.Count) {
-            Write-Host "No more IP available. Add new static IP in the DHCP and update 'dhcp_max_ip' in the configuration file!"
-            return
-        }
-        Write-Host ("Creating the virtualized ESXi " + $availableInfo[$availableIdx].name) -ForegroundColor $DefaultColor
+    # Collect information about existing vESXi
+    $existingMacs = @()
+    foreach ($mac in $onVesx | Get-NetworkAdapter | Select-Object -Property MacAddress) {
+        $existingMacs += $mac
+    }
+    $macIdx = 1
+    for ($i = $onVesx.Count; $i -lt $e.nb_vesx; $i++) {
+        # Compute the mac address for the new vESXi
+        do {
+            if ($macIdx -lt 10) {
+                $idxStr = "0" + $macIdx
+            }
+            else {
+                $idxStr = $macIdx
+            }
+            $macStr = $e.dhcp_mac_addr + $idxStr
+            $macIdx++
+        } while ($existingMacs -match $macStr)
+        $nameStr = NameFromMAC($macStr)
+        Write-Host ("Creating the virtualized ESXi {0}" -f $nameStr ) -ForegroundColor $DefaultColor
         if ($createFromClone) {
             # Create the vESXi from an existing vESXi
-            $vesx = New-VM -VM $cloneSrc -VMHost $ip2obj[$e.ip] -Name $availableInfo[$availableIdx].name -DiskStorageFormat Thin
+            $vesx = New-VM -VM $cloneSrc -VMHost $ip2obj[$e.ip] -Name $nameStr -DiskStorageFormat Thin
         }
         else {
             # Create the vESXi from OVF
-            $vesx = Import-vApp -Source $vEsxOVF -VMHost $ip2obj[$e.ip] -Name $availableInfo[$availableIdx].name -DiskStorageFormat Thin
+            $vesx = Import-vApp -Source $vEsxOVF -VMHost $ip2obj[$e.ip] -Name $nameStr -DiskStorageFormat Thin
             $createFromClone = $true
             $cloneSrc = $vesx
         }
         # Set the MAC address
-        $vesx | Get-NetworkAdapter | Set-NetworkAdapter -MacAddress $availableInfo[$availableIdx].mac -Confirm:$false -StartConnected:$true | Out-Null
+        $vesx | Get-NetworkAdapter | Set-NetworkAdapter -MacAddress $macStr -Confirm:$false -StartConnected:$true | Out-Null
         # Power on the vESXi
-        Write-Host ("Power on the VM " + $availableInfo[$availableIdx].name) -ForegroundColor $DefaultColor
+        Write-Host ("Power on the VM " + $nameStr) -ForegroundColor $DefaultColor
         $vesx | Start-VM | Out-Null
         Start-Sleep -Seconds 1
+        $existingMacs += $macStr
     }
 }
 
 $onVesx = Get-VM -Name "vesx*" | Where-Object { $_.PowerState -eq "PoweredOn" }
 Write-Host ("Check connection of {0} vESXi" -f $onVesx.Count) -ForegroundColor $DefaultColor
-$vesxNames = @()
+$vesxIPs = @()
 foreach ($vesx in $onVesx) {
     $vesxIp = $vesx.Guest.IPAddress[0]
     while (!$vesxIp) {
@@ -284,18 +310,16 @@ foreach ($vesx in $onVesx) {
         $oReturn = Test-Connection -computername $vesxIp -Count 1 -quiet
     }
     try {
-        $vmh = Get-VMHost -Name $vesxIp
+        Get-VMHost -Name $vesxIp | Out-Null
     }
     catch {
-        $vesxNames += $vesxIp
+        $vesxIPs += $vesxIp
     }
     # Wait to avoid overfilling the network
     Start-Sleep -Milliseconds 300
 }
 Write-Host ("Available vESXi: ") -ForegroundColor $DefaultColor
-$vesxNames
-
-Wait-Hosts
+$vesxIPs
 
 # Compute available names for datacenter creations
 Write-Host "Connect the vESXi to datacenters" -ForegroundColor $DefaultColor
@@ -326,11 +350,11 @@ foreach ($dc in Get-Datacenter -Name ($basenameDC + "*")) {
     $vesx = Get-VMHost -Location $dc
     for ($i = $vesx.Count; $i -lt $nbEsxPerDC; $i++, $availableIdx++) {
         # Connect vESXi to the datacenter
-        Write-Host ("Connect {0} to the {1}" -f $vesxNames[$availableIdx], $dc) -ForegroundColor $DefaultColor
-        $vmh = Add-VMHost -Name $vesxNames[$availableIdx] -Location $dc -User $vConfig.user -Password $vConfig.pwd -Force
+        Write-Host ("Connect {0} to the {1}" -f $vesxIPs[$availableIdx], $dc) -ForegroundColor $DefaultColor
+        $vmh = Add-VMHost -Name $vesxIPs[$availableIdx] -Location $dc -User $vConfig.user -Password $vConfig.pwd -Force
         # Check the datastore configuration
-        $ds = Get-Datastore -VMHost $vmh
-        $dsName = "vDatastore" + $vesxNames[$availableIdx].split(".")[3]
+        $ds = Get-Datastore -VMHost $vmh | Where-Object { $_.Name -notlike "vSan*" }
+        $dsName = "vDatastore" + $vesxIPs[$availableIdx].split(".")[3]
         if ($ds.Count -gt 0 -and $ds[0].Name -ne $dsName) {
             # Update the datastore ID to an unique ID
             Write-Host ("Removing the datastore of {0}" -f $vmh) -ForegroundColor $DefaultColor
@@ -369,34 +393,37 @@ if ($vSanMode) {
         Write-Host ("Creating the cluster {0}" -f ("vSan" + $d.Name)) -ForegroundColor $DefaultColor
         try {
             $cl = Get-Cluster -Name ("vSan" + $d.Name)
+            Write-Host("Cluster {0} already exists!" -f $cl) -ForegroundColor $DefaultColor
         }
         catch {
             $cl = New-Cluster -Name ("vSan" + $d.Name) -Location $d
         }
-        Write-Host ("Configuring vESXi to create the vSan from the cluster {0}" -f $cl) -ForegroundColor $DefaultColor
+        Write-Host ("Configuring vESXi to create the vSan storage from the cluster {0}" -f $cl) -ForegroundColor $DefaultColor
         foreach ($vmh in (Get-VMHost -Location $d)) {
             Write-Host ("Configuring the vESXi {0}" -f $vmh) -ForegroundColor $DefaultColor
             Move-VMHost -VMHost $vmh -Destination $cl | Out-Null
-            Write-Host "Enable vSan system" -ForegroundColor $DefaultColor
             $na = Get-VMHostNetworkAdapter -VMHost $vmh -VMKernel | Where-Object { ! $_.VsanTrafficEnabled }
-            $na | Set-VMHostNetworkAdapter -VsanTrafficEnabled $true -Confirm:$false | Out-Null
-            $dataDisk = $vmh | Get-VMHostDisk | Where-Object { $_.TotalSectors -eq 83886080 }
-            Write-Host "Configuring disks" -ForegroundColor $DefaultColor
-            $cacheDisk = $vmh | Get-VMHostDisk | Where-Object { $_.TotalSectors -eq 20971520 }
-            if (!$cacheDisk.ScsiLun.IsSsd) {
-                Write-Host ("Mark the disk {0} as a SSD Disk" -f $cacheDisk) -ForegroundColor $DefaultColor
-                $cli = Get-EsxCli -VMHost $vmh
-                $sat = ($cli.storage.nmp.device.list() | Where-Object { $_.Device -eq $cacheDisk.ScsiLun.CanonicalName }).StorageArrayType
-                $cli.storage.nmp.satp.rule.add($null, $null, $null, $cacheDisk.ScsiLun.CanonicalName, $null, $null, $null, "enable_ssd", $null, $null, $sat, $null, $null, $null) | Out-Null
-                $cli.storage.core.claiming.reclaim($cacheDisk.ScsiLun.CanonicalName) | Out-Null
-            }
-            # Use RunAsync to run this task in order to avoid weird error (bug ?)
-            $diskGroup = Get-VsanDiskGroup -VMHost $vmh
-            if ($diskGroup.Count -eq 0) {
-                $task = New-VsanDiskGroup -VMHost $vmh -DataDiskCanonicalName $dataDisk -SsdCanonicalName $cacheDisk -RunAsync
-                while ($task.state -eq "Running") {
-                    Start-Sleep -Seconds 10
-                    $task = Get-Task -ID $task.id
+            if ($na.Count -gt 0) {
+                Write-Host "Enable vSan system" -ForegroundColor $DefaultColor
+                $na | Set-VMHostNetworkAdapter -VsanTrafficEnabled $true -Confirm:$false | Out-Null
+                $dataDisk = $vmh | Get-VMHostDisk | Where-Object { $_.TotalSectors -eq 83886080 }
+                Write-Host "Configuring disks" -ForegroundColor $DefaultColor
+                $cacheDisk = $vmh | Get-VMHostDisk | Where-Object { $_.TotalSectors -eq 20971520 }
+                if (!$cacheDisk.ScsiLun.IsSsd) {
+                    Write-Host ("Mark the disk {0} as a SSD Disk" -f $cacheDisk) -ForegroundColor $DefaultColor
+                    $cli = Get-EsxCli -VMHost $vmh
+                    $sat = ($cli.storage.nmp.device.list() | Where-Object { $_.Device -eq $cacheDisk.ScsiLun.CanonicalName }).StorageArrayType
+                    $cli.storage.nmp.satp.rule.add($null, $null, $null, $cacheDisk.ScsiLun.CanonicalName, $null, $null, $null, "enable_ssd", $null, $null, $sat, $null, $null, $null) | Out-Null
+                    $cli.storage.core.claiming.reclaim($cacheDisk.ScsiLun.CanonicalName) | Out-Null
+                }
+                # Use RunAsync to run this task in order to avoid weird error (bug ?)
+                $partitions = $dataDisk | Get-VMHostDiskPartition
+                if ($partitions.Count -eq 0) {
+                    $task = New-VsanDiskGroup -VMHost $vmh -DataDiskCanonicalName $dataDisk -SsdCanonicalName $cacheDisk -RunAsync
+                    while ($task.state -eq "Running") {
+                        Start-Sleep -Seconds 10
+                        $task = Get-Task -ID $task.id
+                    }
                 }
             }
         }
