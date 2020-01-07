@@ -23,7 +23,7 @@ while (!$oReturn) {
         }
     }
     catch {
-        Write-Host "Connection failed ! New connection after 20 seconds..."    
+        Write-Host "Connection failed ! New connection after 20 seconds..."
         Start-Sleep -Seconds 20
     }
 }
@@ -39,7 +39,7 @@ Write-Host "Waiting for vESXi losing their connection"
 foreach ($dc in (Get-Datacenter -Name ($basenameDC + "*"))) {
     foreach ($vmh in (Get-VMHost -Location $dc)) {
         while ($vmh.ConnectionState -ne "NotResponding") {
-            Write-Host ("The vESXi {0} is connected. Waiting for the deconnection..." -f $vmh)
+            Write-Host ("The vESXi {0} is connected. Waiting for the disconnection..." -f $vmh)
             Start-Sleep -Seconds 10
             $vmh = Get-VMHost -Name $vmh.Name
         }
