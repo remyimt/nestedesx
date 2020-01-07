@@ -12,8 +12,17 @@ $vConfig = $config.virtual_esx
 # New user basename
 $basenameUser = $config.architecture.user_basename
 
+function NameFromMAC {
+    param (
+        [string]
+        $macAddr
+    )
+    $array = $macAddr.Split(":")
+    return $vConfig.basename + $array[4] + "_" + $array[5]
+}
+
 # Connection to vSphere
-Write-Host "Connecting to vSphere"
+Write-Host "+ Connecting to vSphere"
 $oReturn = $false
 while (!$oReturn) {
     try {
@@ -25,15 +34,32 @@ while (!$oReturn) {
         }
     }
     catch {
-        Write-Host "Connection failed ! New connection after 20 seconds..."    
+        Write-Host "Connection failed ! New connection after 20 seconds..."
         Start-Sleep -Seconds 20
     }
 }
 
+# Check that required users exist
+$userIdx = 1
+$missingUsers = @()
+foreach ($dc in Get-Datacenter -Name ($basenameDC + "*")) {
+    $userName = "VSPHERE.LOCAL\" + $basenameUser + $userIdx++
+    $oReturn = Get-VIAccount -Name $userName
+    if (!$oReturn) {
+        $missingUsers += $userName
+    }
+}
+if ($missingUsers.Count -gt 0) {
+    Write-Host "Please create the following users before executing again this script:"
+    $missingUsers
+    return
+}
+
+# Add permissions to users
 $userIdx = 1
 foreach ($dc in (Get-Datacenter -Name ($basenameDC + "*") | Sort-Object -Property Name)) {
     $userName = "VSPHERE.LOCAL\" + $basenameUser + $userIdx
-    Write-Host ("Configure the permissions for the user {0}" -f $userName)
+    Write-Host ("+ Configure the permissions for the user {0}" -f $userName)
     $oReturn = Get-VIAccount -Name $userName
     if (!$oReturn) {
         Write-Error ("User {0} does not exist, please add the user to the vCenter" -f $userName)
@@ -42,23 +68,20 @@ foreach ($dc in (Get-Datacenter -Name ($basenameDC + "*") | Sort-Object -Propert
     else {
         Write-Host ("Remove existing permissions for {0}" -f $userName)
         Get-VIPermission -Principal $userName | Remove-VIPermission -Confirm:$false
-        Write-Host ("Add permissions on the datacenter {0}" -f $dc.Name)
+        Write-Host ("Add permissions to the datacenter {0}" -f $dc.Name)
         $oReturn = Get-VIPermission -Entity $dc | Where-Object { $_.Principal -eq $userName }
         if (!$oReturn) {
-            New-VIPermission -Entity $dc -Propagate $true -Principal $userName -Role Admin
+            New-VIPermission -Entity $dc -Propagate $true -Principal $userName -Role Admin | Out-Null
         }
         foreach ($h  in (Get-VMHost -Location $dc)) {
             Write-Host ("Get VM associated to the host {0}" -f $h)
-            $vesxIdx = $h.Name.split(".")[3] - $vConfig.ip_offset
-            if ($vesxIdx -lt 10 ) {
-                $vesx = Get-VM -Name ($vConfig.basename + "0" + $vesxIdx)
-            }
-            else {
-                $vesx = Get-VM -Name ($vConfig.basename + $vesxIdx)
-            }
+            $mac = $h | Get-VMHostNetworkAdapter | Select-Object -Property Mac
+            $vmName = NameFromMAC($mac[0].Mac)
+            $vesx = Get-VM -Name $vmName
+            Write-Host ("Add permissions to the VM {0}" -f $vesx)
             $oReturn = Get-VIPermission -Entity $vesx | Where-Object { $_.Principal -eq $userName }
             if (!$oReturn) {
-                New-VIPermission -Entity $vesx -Propagate $true -Principal $userName -Role Admin
+                New-VIPermission -Entity $vesx -Propagate $true -Principal $userName -Role Admin | Out-Null
             }
         }
         $userIdx++
