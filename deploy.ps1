@@ -24,6 +24,14 @@ function NameFromMAC {
     $array = $macAddr.Split(":")
     return $vConfig.basename + $array[4] + "_" + $array[5]
 }
+function NameFromIP {
+    param (
+        [string]
+        $ipAddr
+    )
+    $array = $ipAddr.Split(".")
+    return "vDatastore" + $array[2] + "_" + $array[3]
+}
 function Get-VMFromHost {
     param (
         [VMware.VimAutomation.ViCore.Types.V1.Inventory.VMHost]
@@ -190,6 +198,7 @@ foreach ($e in $esxConfig) {
 Write-Host "Delete vESXi with configuration issues" -ForegroundColor $DefaultColor
 # Get the datastores that do not belong to a vSan cluster
 $dsWithIssues = Get-Datastore -Name "vsan*" | Where-Object { (Get-Cluster -Name "vsan*" | Get-Datastore) -CNotContains $_ }
+$dsWithIssues
 if ($dsWithIssues.Count -gt 0) {
     # Disconnect the hosts using these datastores from their datacenter
     foreach ($vmh in (Get-VMHost -Datastore $dsWithIssues)) {
@@ -208,7 +217,15 @@ foreach ($e in $esxConfig) {
         # Remove the vESXi from the datacenter
         Write-Host ("Disconnect the vESXi associated to {0}" -f $onVesx[$i]) -ForegroundColor $DefaultColor
         $esxName = $onVesx[$i].Guest.IPAddress[0]
-        Remove-HostFromDC(Get-VMHost -Name $esxName)
+        try {
+            $vmh = Get-VMHost -Name $esxName
+            Remove-HostFromDC($vmh)
+        }
+        catch {
+            Write-Host("Not found host {0}" -f $esxName) -ForegroundColor $ErrorColor
+            Write-Host("Stop the VM {0}" -f $onVesx[$i])
+            $onVesx[$i] | Stop-VM -Confirm:$false
+        }
     }
 }
 
@@ -354,7 +371,7 @@ foreach ($dc in Get-Datacenter -Name ($basenameDC + "*")) {
         $vmh = Add-VMHost -Name $vesxIPs[$availableIdx] -Location $dc -User $vConfig.user -Password $vConfig.pwd -Force
         # Check the datastore configuration
         $ds = Get-Datastore -VMHost $vmh | Where-Object { $_.Name -notlike "vSan*" }
-        $dsName = "vDatastore" + $vesxIPs[$availableIdx].split(".")[3]
+        $dsName = NameFromIP($vesxIPs[$availableIdx])
         if ($ds.Count -gt 0 -and $ds[0].Name -ne $dsName) {
             # Update the datastore ID to an unique ID
             Write-Host ("Removing the datastore of {0}" -f $vmh) -ForegroundColor $DefaultColor
@@ -376,14 +393,15 @@ if ($alwaysDatastore) {
             if ($ds.Count -eq 0) {
                 # Create a datastore from the smallest disk
                 $disks = Get-VMHostDisk -VMHost $esx | Sort-Object -Property TotalSectors
-                New-Datastore -VMHost $esx -Name ("vDatastore" + $esx.Name.Split(".")[3]) -Path $disks[0].ScsiLun -Vmfs -Confirm:$false | Out-Null
+                $dsName = NameFromIP($esx.Name)
+                New-Datastore -VMHost $esx -Name $dsName -Path $disks[0].ScsiLun -Vmfs -Confirm:$false | Out-Null
             }
         }
     }
 }
 # Enable Promiscuous mode to allow VM on nested ESXi to communicate
 Write-Host "Allow the promiscuous mode on virtual switches" -F $DefaultColor
-Get-VirtualSwitch -Standard | Where-Object { !(Get-SecurityPolicy -VirtualSwitch $_).AllowPromiscuous } | Get-SecurityPolicy | Set-SecurityPolicy -AllowPromiscuous $true
+Get-VirtualSwitch -Standard | Where-Object { !(Get-SecurityPolicy -VirtualSwitch $_).AllowPromiscuous } | Get-SecurityPolicy | Set-SecurityPolicy -AllowPromiscuous $true | Out-Null
 
 # Create vSan Clusters
 if ($vSanMode) {
@@ -483,3 +501,6 @@ if ($iso.Count -gt 0 -and $ds.Count -gt 0) {
         }
     }
 }
+
+# Disable maintenance mode on vESXi (sometimes, vESXi stay in maintenance mode)
+Get-VMHost | Where-Object { $_.ConnectionState -eq "Maintenance" } | Set-VMHost -State "Connected"
