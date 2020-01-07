@@ -33,6 +33,7 @@ while ! [[ $(nc -w 5 "$host" 22 <<< "\0" ) =~ "OpenSSH" ]]; do
   echo "Waiting for the SSH Server"
   sleep 10
 done
+sleep 10
 echo "The SSH server on $host is running!"
 echo "NOTE: You can copy your SSH keys with './copy-ssh-key.sh $host"
 
