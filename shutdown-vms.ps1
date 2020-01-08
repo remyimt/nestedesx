@@ -41,7 +41,7 @@ if ($oReturn) {
     }
     else {
         $pEsx.foreach{
-            Write-Host("Stop the host {0]" -f $_)
+            Write-Host("Stop the host {0}" -f $_)
             Stop-VMHost -VMHost $_ -Force -Confirm:$false
         }
     }
