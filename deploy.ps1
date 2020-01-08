@@ -116,7 +116,7 @@ if ($vSanMode) {
     }
 }
 foreach ($e in $esxConfig) {
-    if ($e.nb_vesx -ge $e.dhcp_max_addr) {
+    if ($e.nb_vesx -gt $e.dhcp_max_addr) {
         Write-Host ("The number of vESXi ({0}) of the pESXi {1} can not be greater than the number of DHCP addresses ({2}).
         Please check your configuration file." -f $e.nb_vesx, $e.ip, $e.dhcp_max_addr) -ForegroundColor $ErrorColor
         return
@@ -308,6 +308,8 @@ foreach ($e in $esxConfig) {
         Start-Sleep -Seconds 1
         $existingMacs += $macStr
     }
+    $onVesx = Get-VM -Name "vesx*" -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" }
+    Write-Host ("Number of vESXi hosted on {0}: {1} / {2}" -f $e.ip, $onVesx.Count, $e.nb_vesx) -ForegroundColor $DefaultColor
 }
 
 $onVesx = Get-VM -Name "vesx*" | Where-Object { $_.PowerState -eq "PoweredOn" }
@@ -337,6 +339,8 @@ foreach ($vesx in $onVesx) {
 }
 Write-Host ("Available vESXi: ") -ForegroundColor $DefaultColor
 $vesxIPs
+
+Wait-Hosts
 
 # Compute available names for datacenter creations
 Write-Host "Connect the vESXi to datacenters" -ForegroundColor $DefaultColor
