@@ -62,6 +62,7 @@ corriger les problèmes d'affichage, par exemple, des propriétés de la VM :
 * Modifier les mots de passe du fichier *embedded_vCSA_on_ESXi.json* et les reporter dans le fichier *configuration.json*
 * **ATTENTION**: Dans les fichiers *embedded_vCSA_on_ESXi.json* et *configuration.json* tous les mots de passe sont en clair !
 * Monter l'image sur le poste d'installation (Windows, Linux ou Mac) et lancer l'installeur en précisant le chemin vers le fichier *embedded_vCSA_on_ESXi.json*
+* **ATTENTION** Pour installer le vCenter, l'ESXi doit avoir accès à Internet.
 ##### Sous Linux (Ubuntu 18.04)
 ```
 mkdir /tmp/vcsa
@@ -150,6 +151,8 @@ de vESXi (ESXi installés dans des VM) hébergés par chaque ESXi (physique).
   * *ip* : IP de l'ESXi
   * *user* : Utilisateur pour se connecter à l'ESXi
   * *pwd* : Mot de passe de l'utilisateur
+  * *dhcp_mac_addr* : Base pour créer les addreses MAC des vESXi
+  * *dhcp_max_addr* : Nombre d'adresses IP statiques enregistrées (pour les vESXi) dans le serveur DHCP
   * *nb_vesx* : Nombre de vESXi hébergés par l'ESXi
 
 #### La section *virtual_esx* (obligatoire)
@@ -158,15 +161,6 @@ de vESXi (ESXi installés dans des VM) hébergés par chaque ESXi (physique).
   * *pwd* : Mot de passe de l'utilisateur
   * *basename* : Base de nom utilisé pour créer les VM contenant les vESXi. Le nom complet est formé par
   cette base suivie d'un chiffre.
-  * *ip_base* : Trois premiers nombres de l'adresse IP des VM des vESXi
-  * *ip_offset* : Début du dernier nombre de l'adresse IP des VM des vESXi. Ce nombre est incrémenté de 1 à chaque création de VM.
-  * *dhcp_max_ip* : Nombre d'IP statiques configurées dans le serveur DHCP pour les vESXi
-  * **NOTE**: la configuration des IP des vESXi est gérée par le switch. Les derniers champs sont donc à modifier si la configuration IP du DHCP est modifiée. 
-* Exemple de calcul d'IP d'un vESXi
-  * *ip_base* : *42.42.1.*
-  * *ip_offset* : *40*
-  * On concatène les deux valeurs (42.42.1.40) puis on incrémente à chaque création de VM
-  * La 1ère VM créée (premier vESXi) aura pour IP *42.42.1.41*, la 2e VM aura pour IP *42.42.1.42*, la 13e aura pour IP *42.42.1.53*
 
 #### La section *architecture* (obligatoire)
 * Cette section regroupe toutes les informations supplémentaires nécessaires à la création de l'infrastructure virtuelle.
@@ -187,14 +181,23 @@ de vESXi (ESXi installés dans des VM) hébergés par chaque ESXi (physique).
 ### Configuration réseau du switch
 * La connexion Internet est configurée sur l'entrée WAN du switch.
 * Il est conseillé de brancher le poste d'installation sur le switch pour accélérer l'installation du cluster.
-* Adresses IP statiques pour les NUC
-  * IP dynamiques : 42.42.1.[90-120]
-  * Nuc1  42.42.1.11 b8:ae:ed:7c:3a:87
-  * Nuc2  42.42.1.12 f4:4d:30:6a:8c:68
-  * Nuc3  42.42.1.13 b8:ae:ed:7d:9e:80
-  * Nuc4  42.42.1.14 f4:4d:30:69:68:2c
-  * vesx1-30 42.42.1.[21-50] 00:50:56:a1:00:[01-30]
-  * **NOTE** : le dernier nombre des adresses MAC des vESXi ne contient pas de caractère hexadécimal
+* Le switch est configuré avec un VLAN différent par port. Chaque VLAN propose 50 adressses IP dynamiques.
+La communication inter-VLAN est gérée par le switch.
+  * Port 1 : 42.42.1.0 (VLAN1)
+  * Port 2 : 42.42.2.0 (VLAN2)
+  * Port 3 : 42.42.3.0 (VLAN3)
+  * Port 4 : 42.42.4.0 (VLAN4)
+  * Wifi : VMwareTP_best -> VLAN1, VMwareTP_bof -> VLAN2
+* Adresses IP statiques pour les NUC (ESXi physique)
+  * Nuc1  42.42.1.2 b8:ae:ed:7c:3a:87
+  * Nuc2  42.42.2.2 f4:4d:30:6a:8c:68
+  * Nuc3  42.42.3.2 b8:ae:ed:7d:9e:80
+  * Nuc4  42.42.4.2 f4:4d:30:69:68:2c
+* Adresses IP statiques pour les VM (vESXi)
+  * vesx1-10 42.42.1.[11-20] 00:50:56:a1:01:[01-10]
+  * vesx11-20 42.42.2.[11-20] 00:50:56:a1:02:[01-10]
+  * vesx21-30 42.42.3.[11-20] 00:50:56:a1:03:[01-10]
+  * vesx31-40 42.42.4.[11-20] 00:50:56:a1:04:[01-10]
 ```
 ================
 = Nuc3 == Nuc4 =
@@ -320,7 +323,7 @@ home
   * Quitter PowerShell et relancer PowerShell
 
 #### Connect to vCenter administration console
-* https://42.42.1.3:5480/login
+* https://42.42.4.4:5480/login
 * Use the root account to login
 
 #### Connect to vCenter databases
