@@ -1,7 +1,8 @@
 # Every error stops the script immediately
 $ErrorActionPreference = "Stop"
-Write-Host "Read the configuration file"
-$config = Get-Content -Raw -Path configuration.json | ConvertFrom-Json
+
+# The header reads the configuration file ($config variable)
+./header.ps1
 
 # vSphere Account
 $vcenterIp = $config.vcenter.ip
@@ -28,11 +29,11 @@ while (!$oReturn) {
     }
 }
 Write-Host "Delete Student VM:"
-$vms = Get-VM | Where-Object { $_.Name -notlike "vesx*" -and $_.Name -notlike "Embedded*" -and (Get-VMHost -VM $_).ConnectionState -eq "Connected" }
+$vms = Get-VM | Where-Object { $_.Name -notlike "vesx*" -and $_.Name -notlike "Embedded*" -and $_.Name -notlike "Manager*" -and $_.Name -notlike "vyos*" -and (Get-VMHost -VM $_).ConnectionState -eq "Connected" }
 $vms | Where-Object { $_.PowerState -eq "PoweredOn" } | Stop-VM -Confirm:$false
 $vms | Remove-VM -DeletePermanently -Confirm:$false
 Write-Host "Delete vESXi VM:"
-$vms = Get-VM | Where-Object { $_.Name -like "vesx*" -and $_.Name -notlike "Embedded*" }
+$vms = Get-VM | Where-Object { $_.Name -like "vesx*" -and $_.Name -notlike "Embedded*" -and $_.Name -notlike "Manager*" -and $_.Name -notlike "vyos*"}
 $vms | Where-Object { $_.PowerState -eq "PoweredOn" } | Stop-VM -Confirm:$false
 $vms | Remove-VM -DeletePermanently -Confirm:$false
 Write-Host "Waiting for vESXi losing their connection"

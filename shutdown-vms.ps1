@@ -1,5 +1,5 @@
-Write-Host "Read the configuration file"
-$config = Get-Content -Raw -Path configuration.json | ConvertFrom-Json
+# The header reads the configuration file ($config variable)
+./header.ps1
 
 # vSphere Account
 $vcenterIp = $config.vcenter.ip
@@ -13,7 +13,7 @@ Write-Host "Connecting to vSphere"
 $oReturn = Connect-VIServer -Server $vcenterIp -User $vcenterUser -Password $vcenterPwd
 if ($oReturn) {
     Write-Host "Shutdown Running VM"
-    $runningVM = Get-VM | Where-Object { $_.Name -notlike "vesx*" -and $_.Name -notlike "Embedded*" -and $_.PowerState -eq "PoweredOn" }
+    $runningVM = Get-VM | Where-Object { $_.Name -notlike "vesx*" -and $_.Name -notlike "Embedded*" -notlike "Manager*" -and $_.Name -notlike "vyos*" -and $_.PowerState -eq "PoweredOn" }
     if ($runningVM.Count -lt 0) {
         $runningVM | Stop-VM -Confirm:$false
         Start-Sleep -Seconds 10

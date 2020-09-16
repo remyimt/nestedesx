@@ -1,5 +1,5 @@
-Write-Host "Read the configuration file"
-$config = Get-Content -Raw -Path configuration.json | ConvertFrom-Json
+# The header reads the configuration file ($config variable)
+./header.ps1
 
 # vSphere Account
 $vcenterIp = $config.vcenter.ip

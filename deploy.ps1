@@ -1,8 +1,8 @@
 # Every error stops the script immediately
 $ErrorActionPreference = "Stop"
-# Beautiful colors
-$DefaultColor = "DarkGray"
-$ErrorColor = "Red"
+
+# The header reads the configuration file ($config variable)
+./header.ps1
 
 #### Functions
 function Wait-Hosts {
@@ -66,9 +66,6 @@ function Remove-HostFromDC {
     $vm | Stop-VM -Confirm:$false | Out-Null
 }
 #### End of Functions
-
-Write-Host "Read the configuration file" -ForegroundColor $DefaultColor
-$config = Get-Content -Raw -Path configuration.json | ConvertFrom-Json
 
 # vSphere Account
 $vcenterIp = $config.vcenter.ip
@@ -163,7 +160,10 @@ if ($missing.Count -gt 0) {
     $missing.foreach{
         Write-Host $_.ip -ForegroundColor $ErrorColor
     }
-    return
+    $answer = Read-Host -Prompt 'Do you want to continue? (yes/no)'
+    if ($answer -ne 'yes') {
+        return
+    }
 }
 Write-Host "Retrieve the datacenter $datacenter" -ForegroundColor $DefaultColor
 try {
@@ -302,6 +302,7 @@ foreach ($e in $esxConfig) {
         }
         # Set the MAC address
         $vesx | Get-NetworkAdapter | Set-NetworkAdapter -MacAddress $macStr -Confirm:$false -StartConnected:$true | Out-Null
+        $vesx | Get-NetworkAdapter | Set-NetworkAdapter -NetworkName "internal-network" -Confirm:$false -StartConnected:$true | Out-Null
         # Power on the vESXi
         Write-Host ("Power on the VM " + $nameStr) -ForegroundColor $DefaultColor
         $vesx | Start-VM | Out-Null
