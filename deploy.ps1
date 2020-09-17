@@ -2,7 +2,7 @@
 $ErrorActionPreference = "Stop"
 
 # The header reads the configuration file ($config variable)
-./header.ps1
+& "$PSScriptRoot/header.ps1"
 
 #### Functions
 function Wait-Hosts {

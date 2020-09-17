@@ -1,5 +1,5 @@
 # The header reads the configuration file ($config variable)
-./header.ps1
+& "$PSScriptRoot/header.ps1"
 
 # vSphere Account
 $vcenterIp = $config.vcenter.ip

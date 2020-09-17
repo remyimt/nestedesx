@@ -1,5 +1,6 @@
 # Path to the configuration file
-$config_path = "configuration.json"
+$config_path = $PSScriptRoot + "/configuration.json"
+Write-Host ("Config path: {0}" -f $PSScriptRoot)
 
 # Beautiful colors
 $global:DefaultColor = "DarkGray"
