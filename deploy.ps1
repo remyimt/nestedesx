@@ -81,6 +81,7 @@ $ip2obj = @{ }
 $datacenter = $config.architecture.main_dc
 # Path to the OVF file to deploy
 $vEsxOVF = $config.architecture.ovf
+$vEsxOVFpwd = $config.architecture.ovf_pwd
 # Number of vESXi per datacenter
 $nbEsxPerDC = $config.architecture.nb_vesx_datacenter
 # New Datacenter basename
@@ -263,7 +264,7 @@ Get-VMHost | Where-Object { $_.ConnectionState -eq "Maintenance" } | Set-VMHost 
 foreach ($e in $esxConfig) {
     $onVesx = Get-VM -Name "vesx*" -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" }
     $offVesx = Get-VM -Name "vesx*" -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOff" } | Sort-Object
-    Write-Host ("Number of vESXi hosted on {0}: {1} / {2}" -f $e.ip, $onVesx.Count, $e.nb_vesx) -ForegroundColor $DefaultColor
+    Write-Host ("Check the configuration of {0}: {1} / {2} vESXi(s)" -f $e.ip, $onVesx.Count, $e.nb_vesx) -ForegroundColor $DefaultColor
     if ($e.nb_vesx -gt $onVesx.Count -and $offVesx.Count -gt 0) {
         # There are missing vESXi, start existing VM
         Write-Host ("Start vESXi on {0}" -f $e.ip) -ForegroundColor $DefaultColor
@@ -329,6 +330,7 @@ foreach ($vesx in $onVesx) {
         Start-Sleep -Seconds 20
         $oReturn = Test-Connection -computername $vesxIp -Count 1 -quiet
     }
+    # Check if the VM is already connected to a datacenter
     try {
         Get-VMHost -Name $vesxIp | Out-Null
     }
@@ -342,6 +344,25 @@ Write-Host ("Available vESXi: ") -ForegroundColor $DefaultColor
 $vesxIPs
 
 Wait-Hosts
+
+# Change vESXi password from 'superesx' to the password in the configuration file
+Write-Host ("Change {0} vESXi passwords" -f $vesxIPs.Count) -ForegroundColor $DefaultColor
+foreach($ip in $vesxIPs) {
+    try {
+        $server = Connect-VIServer -Server $ip -User $vConfig.user -Password $vEsxOVFpwd -NotDefault
+    }
+    catch {
+        Write-Host ("Can not connect to {0} with the default password '{1}'. Stop the deployment!" -f $ip, $vEsxOVFpwd) -ForegroundColor $ErrorColor
+        return
+    }
+    try {
+        Set-VMHostAccount -Server $server -UserAccount $vConfig.user -Password $vConfig.pwd
+        Write-Host ("{0} password changed" -f $ip) -ForegroundColor $DefaultColor
+    }
+    catch {
+        Write-Host ("Password modification failure: If the issue perists, please destroy the vESXi VM associated to {0}" -f $ip) -ForegroundColor $ErrorColor
+    }
+}
 
 # Compute available names for datacenter creations
 Write-Host "Connect the vESXi to datacenters" -ForegroundColor $DefaultColor
@@ -357,7 +378,7 @@ if ($dcs.Count -lt $totalDc) {
         }
         catch {
             Write-Host ("Create a new datacenter {0}" -f $dcName) -ForegroundColor $DefaultColor
-            $folder = Get-Folder -NoRecursion
+            $folder = Get-Folder -NoRecursion -Name Datacenters
             $newDC += New-Datacenter -Location $folder -Name $dcName
         }
     }
