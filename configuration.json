@@ -3,45 +3,45 @@
     "ip": "192.168.3.252",
     "host": "192.168.3.1",
     "user": "administrator@vsphere.local",
-    "pwd": "vcenterPWD"
+    "pwd": "VSPHEREPWD"
   },
   "physical_esx": [
     {
       "ip": "192.168.3.1",
       "user": "root",
-      "pwd": "pesxPWD",
+      "pwd": "PESX1PWD",
       "dhcp_mac_addr": "00:50:56:a1:01:",
       "dhcp_max_addr": 10,
-      "nb_vesx": 9
+      "nb_vesx": 3
     },
     {
       "ip": "192.168.3.2",
       "user": "root",
-      "pwd": "pesxPWD",
+      "pwd": "PESX2PWD",
       "dhcp_mac_addr": "00:50:56:a1:02:",
       "dhcp_max_addr": 10,
-      "nb_vesx": 10
+      "nb_vesx": 7
     },
     {
       "ip": "192.168.3.3",
       "user": "root",
-      "pwd": "pesxPWD",
+      "pwd": "PESX3PWD",
       "dhcp_mac_addr": "00:50:56:a1:03:",
       "dhcp_max_addr": 10,
-      "nb_vesx": 10
+      "nb_vesx": 6
     },
     {
       "ip": "192.168.3.4",
       "user": "root",
-      "pwd": "pesxPWD",
+      "pwd": "PESX4PWD",
       "dhcp_mac_addr": "00:50:56:a1:04:",
       "dhcp_max_addr": 10,
-      "nb_vesx": 10
+      "nb_vesx": 5
     }
   ],
   "virtual_esx": {
     "user": "root",
-    "pwd": "vesxPWD",
+    "pwd": "VESXPWD",
     "basename": "vesx"
   },
   "architecture": {
@@ -52,6 +52,7 @@
     "vsan": "false",
     "always_datastore": "true",
     "ovf": "./Files/vesxtp-ovf/vesx-tp.ovf",
+    "ovf_pwd": "superesx",
     "iso_prefix": "./Files/",
     "iso": []
   }
