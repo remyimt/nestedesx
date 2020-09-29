@@ -10,32 +10,24 @@
       "ip": "192.168.3.1",
       "user": "root",
       "pwd": "PESX1PWD",
-      "dhcp_mac_addr": "00:50:56:a1:01:",
-      "dhcp_max_addr": 10,
       "nb_vesx": 3
     },
     {
       "ip": "192.168.3.2",
       "user": "root",
       "pwd": "PESX2PWD",
-      "dhcp_mac_addr": "00:50:56:a1:02:",
-      "dhcp_max_addr": 10,
       "nb_vesx": 7
     },
     {
       "ip": "192.168.3.3",
       "user": "root",
       "pwd": "PESX3PWD",
-      "dhcp_mac_addr": "00:50:56:a1:03:",
-      "dhcp_max_addr": 10,
       "nb_vesx": 6
     },
     {
       "ip": "192.168.3.4",
       "user": "root",
       "pwd": "PESX4PWD",
-      "dhcp_mac_addr": "00:50:56:a1:04:",
-      "dhcp_max_addr": 10,
       "nb_vesx": 5
     }
   ],
@@ -48,6 +40,8 @@
     "main_dc": "SchoolDatacenter",
     "new_dc_basename": "StudentDC",
     "user_basename": "adminDC",
+    "dhcp_mac_addr": "00:50:56:a1:02:",
+    "dhcp_max_addr": 10,
     "nb_vesx_datacenter": 3,
     "vsan": "false",
     "always_datastore": "true",

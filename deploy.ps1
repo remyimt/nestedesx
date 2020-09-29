@@ -22,7 +22,7 @@ function NameFromMAC {
         $macAddr
     )
     $array = $macAddr.Split(":")
-    return $vConfig.basename + $array[4] + "_" + $array[5]
+    return $vConfig.basename + ("{0:d3}" -f [int]("0x{0}" -f $array[5]))
 }
 function NameFromIP {
     param (
@@ -114,12 +114,11 @@ if ($vSanMode) {
     }
 }
 foreach ($e in $esxConfig) {
-    if ($e.nb_vesx -gt $e.dhcp_max_addr) {
-        Write-Host ("The number of vESXi ({0}) of the pESXi {1} can not be greater than the number of DHCP addresses ({2}).
-        Please check your configuration file." -f $e.nb_vesx, $e.ip, $e.dhcp_max_addr) -ForegroundColor $ErrorColor
-        return
-    }
     $totalVesx += $e.nb_vesx
+}
+if ($totalVesx -gt $config.architecture.dhcp_max_addr) {
+    Write-Host ("The number of vESXi can not be greater than {0} (DHCP limitation). Total vESXi : {1}" -f $config.architecture.dhcp_max_addr, $totalVesx) -ForegroundColor $ErrorColor
+    return
 }
 if ($totalVesx % $nbEsxPerDC -ne 0) {
     Write-Host ("The vESXi can not be fairly distributed on datacenters. Total vESXi : {0}" -f $totalVesx) -ForegroundColor $ErrorColor
@@ -213,7 +212,7 @@ if ($dsWithIssues.Count -gt 0) {
 # Power off ESXi VM (vESXi)
 Write-Host "Power off the useless vESXi" -ForegroundColor $DefaultColor
 foreach ($e in $esxConfig) {
-    $onVesx = Get-VM -Name "vesx*" -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" } | Sort-Object -Property "Name" -Descending
+    $onVesx = Get-VM -Name ($vConfig.basename + "*") -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" } | Sort-Object -Property "Name" -Descending
     for ($i = 0; $i -lt ($onVesx.Count - $e.nb_vesx); $i++) {
         # Remove the vESXi from the datacenter
         Write-Host ("Disconnect the vESXi associated to {0}" -f $onVesx[$i]) -ForegroundColor $DefaultColor
@@ -260,37 +259,29 @@ foreach ($dc in $dcs) {
 # Disable maintenance mode on vESXi
 Get-VMHost | Where-Object { $_.ConnectionState -eq "Maintenance" } | Set-VMHost -State "Connected"
 
+# Retrieve all MAC used by the existing vESXi
+$existingMacs = Get-VM -Name ($vConfig.basename + "*") | Get-NetworkAdapter | Select-Object -Property MacAddress
 # Create ESXi VM (vESXi) in the infrastructure
 foreach ($e in $esxConfig) {
-    $onVesx = Get-VM -Name "vesx*" -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" }
-    $offVesx = Get-VM -Name "vesx*" -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOff" } | Sort-Object
+    $onVesx = Get-VM -Name ($vConfig.basename + "*") -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" }
+    $offVesx = Get-VM -Name ($vConfig.basename + "*") -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOff" } | Sort-Object
     Write-Host ("Check the configuration of {0}: {1} / {2} vESXi(s)" -f $e.ip, $onVesx.Count, $e.nb_vesx) -ForegroundColor $DefaultColor
     if ($e.nb_vesx -gt $onVesx.Count -and $offVesx.Count -gt 0) {
         # There are missing vESXi, start existing VM
         Write-Host ("Start vESXi on {0}" -f $e.ip) -ForegroundColor $DefaultColor
         $offVesx | Select-Object -First $e.nb_vesx | Start-VM -Confirm:$false | Out-Null
     }
-    $onVesx = Get-VM -Name "vesx*" -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" }
-    # Collect information about existing vESXi
-    $existingMacs = @()
-    foreach ($mac in $onVesx | Get-NetworkAdapter | Select-Object -Property MacAddress) {
-        $existingMacs += $mac
-    }
+    $onVesx = Get-VM -Name ($vConfig.basename + "*") -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" }
     $macIdx = 1
     for ($i = $onVesx.Count; $i -lt $e.nb_vesx; $i++) {
         # Compute the mac address for the new vESXi
         do {
-            if ($macIdx -lt 10) {
-                $idxStr = "0" + $macIdx
-            }
-            else {
-                $idxStr = $macIdx
-            }
-            $macStr = $e.dhcp_mac_addr + $idxStr
+            $idxStr = "{0:x2}" -f $macIdx
+            $macStr = $config.architecture.dhcp_mac_addr + $idxStr
             $macIdx++
         } while ($existingMacs -match $macStr)
         $nameStr = NameFromMAC($macStr)
-        Write-Host ("Creating the virtualized ESXi {0}" -f $nameStr ) -ForegroundColor $DefaultColor
+        Write-Host ("Creating the virtualized ESXi {0}" -f $nameStr) -ForegroundColor $DefaultColor
         if ($createFromClone) {
             # Create the vESXi from an existing vESXi
             $vesx = New-VM -VM $cloneSrc -VMHost $ip2obj[$e.ip] -Name $nameStr -DiskStorageFormat Thin
@@ -309,11 +300,10 @@ foreach ($e in $esxConfig) {
         Start-Sleep -Seconds 1
         $existingMacs += $macStr
     }
-    $onVesx = Get-VM -Name "vesx*" -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" }
-    Write-Host ("Number of vESXi hosted on {0}: {1} / {2}" -f $e.ip, $onVesx.Count, $e.nb_vesx) -ForegroundColor $DefaultColor
+    $onVesx = Get-VM -Name ($vConfig.basename + "*") -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" }
 }
 
-$onVesx = Get-VM -Name "vesx*" | Where-Object { $_.PowerState -eq "PoweredOn" }
+$onVesx = Get-VM -Name ($vConfig.basename + "*") | Where-Object { $_.PowerState -eq "PoweredOn" }
 Write-Host ("Check connection of {0} vESXi" -f $onVesx.Count) -ForegroundColor $DefaultColor
 $vesxIPs = @()
 foreach ($vesx in $onVesx) {
