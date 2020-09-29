@@ -303,7 +303,6 @@ foreach ($e in $esxConfig) {
         }
         # Set the MAC address
         $vesx | Get-NetworkAdapter | Set-NetworkAdapter -MacAddress $macStr -Confirm:$false -StartConnected:$true | Out-Null
-        $vesx | Get-NetworkAdapter | Set-NetworkAdapter -NetworkName "internal-network" -Confirm:$false -StartConnected:$true | Out-Null
         # Power on the vESXi
         Write-Host ("Power on the VM " + $nameStr) -ForegroundColor $DefaultColor
         $vesx | Start-VM | Out-Null
@@ -327,6 +326,7 @@ foreach ($vesx in $onVesx) {
     }
     $oReturn = Test-Connection -computername $vesxIp -Count 1 -quiet
     while (!$oReturn) {
+        Write-Host ("Fail to ping {0}" -f $vesx) -ForegroundColor $DefaultColor
         Start-Sleep -Seconds 20
         $oReturn = Test-Connection -computername $vesxIp -Count 1 -quiet
     }
