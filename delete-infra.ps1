@@ -12,7 +12,7 @@ $vcenterPwd = $config.vcenter.pwd
 $basenameDC = $config.architecture.new_dc_basename
 
 
-Write-Host "Connecting to vSphere"
+Write-Host "Connecting to vSphere" -ForegroundColor $DefaultColor
 $oReturn = $false
 while (!$oReturn) {
     try {
@@ -28,15 +28,28 @@ while (!$oReturn) {
         Start-Sleep -Seconds 20
     }
 }
-Write-Host "Delete Student VM:"
-$vms = Get-VM | Where-Object { $_.Name -notlike "nsx*" -and $_.Name -notlike "vesx*" -and $_.Name -notlike "Embedded*" -and $_.Name -notlike "Manager*" -and $_.Name -notlike "vyos*" -and (Get-VMHost -VM $_).ConnectionState -eq "Connected" }
+
+Write-Host "Connect all ESXi in maintenance mode:" -ForegroundColor $DefaultColor
+Get-VMHost | Where-Object { $_.ConnectionState -eq "Maintenance" } | Set-VMHost -State "Connected"
+
+Write-Host "Select all student VM:" -ForegroundColor $DefaultColor
+$vms = Get-VM | Where-Object { $_.Name -notlike "nsx*" -and $_.Name -notlike "vesx*" -and `
+    $_.Name -notlike "Embedded*" -and $_.Name -notlike "Manager*" -and $_.Name -notlike "vyos*" `
+    -and (Get-VMHost -VM $_).ConnectionState -eq "Connected" }
+$vms
+Write-Host "Remove orphaned VM:" -ForegroundColor $DefaultColor
+$orphaned = $vms | Where {$_.ExtensionData.Summary.Runtime.ConnectionState -eq "orphaned"}
+$orphaned | Remove-VM -Confirm:$false
+$vms = $vms | Where { $orphaned -notcontains $_ }
+Write-Host "Delete Student VM:" -ForegroundColor $DefaultColor
 $vms | Where-Object { $_.PowerState -eq "PoweredOn" } | Stop-VM -Confirm:$false
 $vms | Remove-VM -DeletePermanently -Confirm:$false
-Write-Host "Delete vESXi VM:"
+Write-Host "Delete vESXi VM:" -ForegroundColor $DefaultColor
 $vms = Get-VM | Where-Object { $_.Name -notlike "nsx*" -and $_.Name -like "vesx*" -and $_.Name -notlike "Embedded*" -and $_.Name -notlike "Manager*" -and $_.Name -notlike "vyos*"}
+$vms
 $vms | Where-Object { $_.PowerState -eq "PoweredOn" } | Stop-VM -Confirm:$false
 $vms | Remove-VM -DeletePermanently -Confirm:$false
-Write-Host "Waiting for vESXi losing their connection"
+Write-Host "Waiting for vESXi losing their connection" -ForegroundColor $DefaultColor
 foreach ($dc in (Get-Datacenter -Name ($basenameDC + "*"))) {
     foreach ($vmh in (Get-VMHost -Location $dc)) {
         while ($vmh.ConnectionState -ne "NotResponding") {
@@ -44,11 +57,11 @@ foreach ($dc in (Get-Datacenter -Name ($basenameDC + "*"))) {
             Start-Sleep -Seconds 10
             $vmh = Get-VMHost -Name $vmh.Name
         }
-        Write-Host ("Remove vESXi {0} from Inventory" -f $vmh)
+        Write-Host ("Remove vESXi {0} from Inventory" -f $vmh) -ForegroundColor $DefaultColor
         Remove-VMHost -VMHost $vmh -Confirm:$false
     }
 }
-Write-Host "Remove clusters"
+Write-Host "Remove clusters" -ForegroundColor $DefaultColor
 Get-Cluster | Remove-Cluster -Confirm:$false
-Write-Host "Remove Student Datacenters"
+Write-Host "Remove Student Datacenters" -ForegroundColor $DefaultColor
 Get-Datacenter -Name ($basenameDC + "*") | Remove-Datacenter -Confirm:$false
