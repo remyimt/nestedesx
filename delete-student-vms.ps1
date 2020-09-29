@@ -11,7 +11,7 @@ $vcenterPwd = $config.vcenter.pwd
 
 $oReturn = Connect-VIServer -Server $vcenterIp -User $vcenterUser -Password $vcenterPwd
 if ($oReturn) {
-    $vms = Get-VM | Where-Object { $_.Name -notlike "vesx*" -and $_.Name -notlike "Embedded*" }
+    $vms = Get-VM | Where-Object { $_.Name -notlike "nsx*" -and $_.Name -notlike "vesx*" -and $_.Name -notlike "Embedded*" -and $_.Name -notlike "Manager*" -and $_.Name -notlike "vyos*" }
     Write-Host ("Detecting {0} VM to delete:" -f $vms.Count)
     $vms
     Start-Sleep -Seconds 5

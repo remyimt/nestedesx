@@ -29,11 +29,11 @@ while (!$oReturn) {
     }
 }
 Write-Host "Delete Student VM:"
-$vms = Get-VM | Where-Object { $_.Name -notlike "vesx*" -and $_.Name -notlike "Embedded*" -and $_.Name -notlike "Manager*" -and $_.Name -notlike "vyos*" -and (Get-VMHost -VM $_).ConnectionState -eq "Connected" }
+$vms = Get-VM | Where-Object { $_.Name -notlike "nsx*" -and $_.Name -notlike "vesx*" -and $_.Name -notlike "Embedded*" -and $_.Name -notlike "Manager*" -and $_.Name -notlike "vyos*" -and (Get-VMHost -VM $_).ConnectionState -eq "Connected" }
 $vms | Where-Object { $_.PowerState -eq "PoweredOn" } | Stop-VM -Confirm:$false
 $vms | Remove-VM -DeletePermanently -Confirm:$false
 Write-Host "Delete vESXi VM:"
-$vms = Get-VM | Where-Object { $_.Name -like "vesx*" -and $_.Name -notlike "Embedded*" -and $_.Name -notlike "Manager*" -and $_.Name -notlike "vyos*"}
+$vms = Get-VM | Where-Object { $_.Name -notlike "nsx*" -and $_.Name -like "vesx*" -and $_.Name -notlike "Embedded*" -and $_.Name -notlike "Manager*" -and $_.Name -notlike "vyos*"}
 $vms | Where-Object { $_.PowerState -eq "PoweredOn" } | Stop-VM -Confirm:$false
 $vms | Remove-VM -DeletePermanently -Confirm:$false
 Write-Host "Waiting for vESXi losing their connection"
