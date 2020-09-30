@@ -325,12 +325,13 @@ foreach ($vesx in $onVesx) {
         Get-VMHost -Name $vesxIp | Out-Null
     }
     catch {
-        $vesxIPs += $vesxIp
+        $vesxIPs += [PSCustomObject]@{'ip' = $vesxIp; 'last' = [int]$vesxIp.split('.')[-1]}
     }
     # Wait to avoid overfilling the network
     Start-Sleep -Milliseconds 300
 }
 Write-Host ("Available vESXi: ") -ForegroundColor $DefaultColor
+$vesxIPs = $vesxIPs | Sort-Object -Property "last" | Select-Object -ExpandProperty ip
 $vesxIPs
 
 Wait-Hosts
