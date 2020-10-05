@@ -7,28 +7,31 @@ Pour installer l'infrastructure nécessaire aux TP, les grandes étapes sont :
 1. Installation des ESXi sur les NUC à partir d'une clé USB et de  l'ISO *VMware-VMvisor-Installer*.
 La clé USB est créée avec Rufus.
 2. Installation du vCenter en ligne de commande à partir du script *vcsa-deploy* disponible dans l'ISO *VMware-VCSA-all*
-3. Deploiement de l'infrastructure virtuelle utilisée pour les TP à l'aide du script *deploy.ps1*
-4. Création d'utilisateurs supplémentaires à partir du vCenter via l'interface web
-5. Attribution des permissions aux nouveaux utilisateurs avec le script *set-permissions.ps1*
-6. Réalisations des TP par les étudiants
+3. Écriture des adresses MAC des vESXi dans le serveur DHCP. Les adresses MAC commencent par la propriété *dhcp_mac_addr* de la section *architecture* suivi du numéro du vESXi en hexadécimal. Par exemple, avec *01:02:03:04:05:* en *dhcp_mac_addr*, l'adresse MAC du vesx012 sera *01:02:03:04:05:0C*.
+4. Deploiement de l'infrastructure virtuelle utilisée pour les TP à l'aide du script *deploy.ps1*
+5. Création d'utilisateurs supplémentaires à partir du vCenter via l'interface web
+6. Attribution des permissions aux nouveaux utilisateurs avec le script *set-permissions.ps1*
+7. Réalisations des TP par les étudiants
 
 ### Liste des fichiers téléchargés pour l'installation de l'infrastructure
-* Hyperviseur ESXi : *VMware-VMvisor-Installer-6.5.0.update02-8294253.x86_64.iso*
+* Hyperviseur ESXi : *VMware-VMvisor-Installer-6.5.0.update02-8294253.x86_64.iso* (Pour l'utilisation NSX, il faut un ESXi 6.7.0)
 * vCenter / vSphere : *VMware-VCSA-all-6.7.0-10244745.iso*
 * Fichier de configuration du vCenter : *embedded_vCSA_on_ESXi.json*
 * Distribution Linux ultra-légère : *tinycore.iso* - version 10
 * Paquet pour l'installation de l'utilitaire *stress* sur tinycore : *stress.tcz*
 
 ### Liste des fichiers disponibles
-* *configuration.json* : fichier de configuration
-* *delete-infra.ps1* : script PowerShell supprimant tous les éléments créés par le script *deploy.ps1*
-* *delete-student-vms.ps1* : script PowerShell effaçant les VM n'étant pas des vESXi
+* *configuration.json* : Fichier de configuration
+* *copy-ssh-key.sh* : Script bash pour copier une clé SSH sur un ESXi (root)
+* *delete-infra.ps1* : Script PowerShell supprimant tous les éléments créés par le script *deploy.ps1*
+* *delete-student-vms.ps1* : Script PowerShell effaçant les VM n'étant pas des vESXi
 * *deploy.ps1* : Script PowerShell déployant l'infrastructure virtualisée via le vCenter
+* *dhcp-generator.sh* : Script bash pour générer la configuration IP des vESXi du serveur DHCP
+* *header.ps1* : Script PowerShell effectuant la connexion au vCenter
 * *set-permissions.ps1* : Script PowerShell configurant les droits des nouveaux utilisateurs pour l'exécution des TP
 * *shutdown-vms.ps1* : Script PowerShell pour éteindre le cluster sauf le vCenter
 * *start.sh* : Script bash pour démarrer le cluster une fois les NUC allumés
 * *stop.sh* : Script bash pour éteindre la totalité du cluster (sauf le switch)
-* *tomato_nuc_cluster.cfg* : Configuration du switch avec firmware Tomato
 * *tp-drs.txt* : TP sur vSphere DRS
 * *tp-ha.txt* : TP sur vSphere HA
 * *tp-vcenter* : TP sur les bases du vCenter
@@ -110,7 +113,7 @@ Set-PowerCLIConfiguration -Scope User -ParticipateInCEIP $false
 Set-PowerCLIConfiguration -InvalidCertificateAction Ignore -Confirm:$false
 ```
 
-##### Déploiement et configuration des VM 
+##### Déploiement et configuration des VM vESXi
 * Le fichier de configuration *configuration.json* est utilisé par le script *deploy.ps1*. Éditer le fichier de
 configuration afin de vérifier les informations. Pour plus de précision sur ce fichier, se reporter à
 [cette section](#le-fichier-de-configuration)
@@ -132,37 +135,38 @@ Les valeurs *new_dc_basename* et *user_basename* sont définis dans le fichier d
 
 ### Le fichier de configuration
 * **ATTENTION** Tous les comptes et mots de passe sont définis dans le fichier de configuration.
-* Le fichier de configuration est un fichier JSON. L'ordre des sections n'a pas d'importance.
-Toutes les propriétés disponibles sont présentes dans le `configuration.json` fourni.
-#### La section *switch* (optionnelle)
-* Cette section est optionnelle car elle n'est pas utilisée par les scripts. Elle rassemble les informations d'administration
-et de connexion au switch pour faciliter le déroulement des exercices destinés aux étudiants.
+* Le fichier de configuration est un fichier JSON. L'ordre des sections n'a pas d'importance. Toutes les propriétés
+doivent être présentes. Toutes les propriétés disponibles sont présentes dans le `configuration.json` fourni.
 
-#### La section *vcenter* (obligatoire)
+#### La section *vcenter*
 * Cette section décrit les informations nécessaires à la gestion du vCenter (connexion, démarrage, arrêt).
   * *ip* : IP du vCenter
   * *host* : IP de l'ESXi hébergeant le vCenter
   * *user* : Utilisateur pour se connecter à vSphere
   * *pwd* : Mot de passe de l'utilisateur
 
-#### La section *physical_esx* (obligatoire)
+#### La section *physical_esx*
 * Cette section décrit les informations nécessaires à la gestion des ESXi ainsi que le nombre
 de vESXi (ESXi installés dans des VM) hébergés par chaque ESXi (physique).
   * *ip* : IP de l'ESXi
   * *user* : Utilisateur pour se connecter à l'ESXi
   * *pwd* : Mot de passe de l'utilisateur
-  * *dhcp_mac_addr* : Base pour créer les addreses MAC des vESXi
-  * *dhcp_max_addr* : Nombre d'adresses IP statiques enregistrées (pour les vESXi) dans le serveur DHCP
   * *nb_vesx* : Nombre de vESXi hébergés par l'ESXi
 
-#### La section *virtual_esx* (obligatoire)
+#### La section *virtual_esx*
 * Cette section décrit les informations utilisées pour la création des VM utilisées pour installer les ESXi virtuels (vESXi). 
   * *user* : Utilisateur pour se connecter au vESXi
-  * *pwd* : Mot de passe de l'utilisateur
+  * *pwd* : Nouveau mot de passe du compte root
   * *basename* : Base de nom utilisé pour créer les VM contenant les vESXi. Le nom complet est formé par
   cette base suivie d'un chiffre.
+**ATTENTION**: Le mot de passe doit correspondre à la politique de sécurité de VMware :
+  * Au moins 8 caractères
+  * Au moins une minuscule
+  * Au moins une majuscule
+  * Au moins un caractère spécial
+  * Moins de 20 caractères
 
-#### La section *architecture* (obligatoire)
+#### La section *architecture*
 * Cette section regroupe toutes les informations supplémentaires nécessaires à la création de l'infrastructure virtuelle.
   * *main_dc* : Nom du datacenter contenant les ESXi physiques (ceux décrit dans la section *physical_esx*
   * *new_dc_basename* : Début du nom des centres de données contenant les vESXi utilisés pour les exercices décrit dans les
@@ -170,45 +174,16 @@ de vESXi (ESXi installés dans des VM) hébergés par chaque ESXi (physique).
   Ce numéro est incrémenté à chaque création d'un datacenter.
   * *user_basename* : Base de nom utilisé pour créer les utilisateurs supplémentaires avec des droits restreints sur l'architecture.
   * *nb_vesx_datacenter* : Nombre de datacenter contenant des vESXi
+  * *dhcp_mac_addr* : Base de nom utilisé (5 premiers nombres hexadécimaux) pour générer les adresses MAC des vESXi.
+  * *dhcp_mac_max* : Nombre maximum de vESXi supportés. Ce nombre correspond au nombre d'IP configurées dans le serveur DHCP.
   * *vsan* : Ajouter et configurer des clusters vSan dans chaque nouveau datacenter
   * *always_datastore* : Créer un datastore à partir du disque le plus petit **si le vESXi n'en possède pas**.
   Si vSan est activé, deux datastores pourront être présents sur chaque vESXi.
-  * *ovf* : l'OVF à déployer pour la création des vESXi
+  * *ovf* : l'OVF/OVA à déployer pour la création des vESXi
+  * *ovf_pwd* : le mot de passe pour se connecter au vESXi installé sur l'OVF. Ce mot de passe sera remplacé par le mot de passe de la section *virtual_esx*.
   * *iso_prefix* : Répertoire contenant les images ISO à copier sur le datastore des vESXi.
-  **ATTENTION** il n'est pas possible de copier une image ISO sur un datastore de type vSan. **Le chemin DOIT finir par un /"**
+  **ATTENTION** il n'est pas possible de copier une image ISO sur un datastore de type vSan. **Le chemin DOIT finir par un /"**.
   * *iso*: Le nom des images ISO à copier sur le datastore des vESXi. Les noms doivent finir par *.iso*.
-
-### Configuration réseau du switch
-* La connexion Internet est configurée sur l'entrée WAN du switch.
-* Il est conseillé de brancher le poste d'installation sur le switch pour accélérer l'installation du cluster.
-* Le switch est configuré avec un VLAN différent par port. Chaque VLAN propose 50 adressses IP dynamiques.
-La communication inter-VLAN est gérée par le switch.
-  * Port 1 : 42.42.1.0 (VLAN1)
-  * Port 2 : 42.42.2.0 (VLAN2)
-  * Port 3 : 42.42.3.0 (VLAN3)
-  * Port 4 : 42.42.4.0 (VLAN4)
-  * Wifi : VMwareTP_best -> VLAN1, VMwareTP_bof -> VLAN2
-* Adresses IP statiques pour les NUC (ESXi physique)
-  * Nuc1  42.42.1.2 b8:ae:ed:7c:3a:87
-  * Nuc2  42.42.2.2 f4:4d:30:6a:8c:68
-  * Nuc3  42.42.3.2 b8:ae:ed:7d:9e:80
-  * Nuc4  42.42.4.2 f4:4d:30:69:68:2c
-* Adresses IP statiques pour les VM (vESXi)
-  * vesx1-10 42.42.1.[11-20] 00:50:56:a1:01:[01-10]
-  * vesx11-20 42.42.2.[11-20] 00:50:56:a1:02:[01-10]
-  * vesx21-30 42.42.3.[11-20] 00:50:56:a1:03:[01-10]
-  * vesx31-40 42.42.4.[11-20] 00:50:56:a1:04:[01-10]
-```
-================
-= Nuc3 == Nuc4 =
-================
-= Nuc1 == Nuc2 =
-================
-=    Switch    =
-================
-= Alimentation =
-================
-```
 
 ### Création des OVF
 #### Création de l'OVF des ESXi virtuels (vESX)
@@ -217,7 +192,7 @@ La communication inter-VLAN est gérée par le switch.
   * Customize hardware
     * CPU: Number: 2, tick both "Expose hardware assisted virtualization to the guest OS"
     and "Enable virtualized CPU performance counters"
-    * Memory: 4 GB
+    * Memory: 4 GB (pour l'utilisation NSX, les ESXi doivent avoir au minimum 8 GB de mémoire)
     * New Hard Disk: 200 GB, Disk Provisioning: Thin Provisioning
     * New CD/DVD drive: Datastore ISO File, tick "Connect"
 * Démarrer la machine virtuelle et installer l'ESXi
