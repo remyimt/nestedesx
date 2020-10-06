@@ -218,17 +218,20 @@ poweroff
 
 #### Création de l'OVF d'une distribution tinyCore à partir de l'ISO *tinycore.iso*
 * Installation de tinyCore sur le disque dur
+  * Créer une VM avec 256 MB de mémoire, 200 MB de disque. Le disque doit être un **disque IDE**.
   * Démarrer la VM et booter sur l'ISO
   * `tce-load -wi tc-install`
-  * `sudo tc-install.sh`
+  * `sudo tc-install.sh` : c - cd-rom, f - Frugal, 1 - Whole disk
   * Éteindre la VM et retirer l'ISO
 * Installation du serveur SSH
   * Créer un mot de passe pour l'utilisateur 'tc' : `passwd`
   * Mot de passe : tiny00PWD
-  * `tce-install -wi openssh`
-  * `cd /usr/local/etc/ssh/`
-  * `sudo cp sshd_config.orig sshd_config`
-  * `sudo /usr/local/etc/init.d/openssh start`
+  ```
+  tce-install -wi openssh
+  cd /usr/local/etc/ssh/
+  sudo cp sshd_config.orig sshd_config
+  sudo /usr/local/etc/init.d/openssh start
+  ```
   * lancement du service au démarrage `vim /opt/bootlocal.sh`
 ```
 #!/bin/sh
