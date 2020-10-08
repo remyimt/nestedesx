@@ -8,44 +8,25 @@ $vcenterPwd = $config.vcenter.pwd
 $vcenterHost = $config.vcenter.host
 
 $datacenter = "SchoolDatacenter"
+$esxName = $args[0]
 
-Write-Host "Connecting to vSphere"
+if ( $esxName.count -eq 0 ) {
+    Write-Host "Shutdown VM on ESXi" -ForegroundColor $DefaultColor
+    Write-Host "Usage: ./shutdown-vms.ps1 esx_ip" -ForegroundColor $DefaultColor
+    exit 13
+}
+Write-Host "Connecting to vSphere" -ForegroundColor $DefaultColor
 $oReturn = Connect-VIServer -Server $vcenterIp -User $vcenterUser -Password $vcenterPwd
 if ($oReturn) {
-    Write-Host "Shutdown Running VM"
-    $runningVM = Get-VM | Where-Object { $_.Name -notlike "nsx*" -and $_.Name -notlike "vesx*" -and $_.Name -notlike "Embedded*" -notlike "Manager*" -and $_.Name -notlike "vyos*" -and $_.PowerState -eq "PoweredOn" }
-    if ($runningVM.Count -lt 0) {
+    Write-Host "Shutdown Running VM" -ForegroundColor $DefaultColor
+    $runningVM = Get-VM -Location $esxName | Where-Object { $_.Name -notlike "nsx*" -and $_.Name -notlike "Manager*" -and $_.Name -notlike "Embedded*" -and $_.Name -notlike "vyos*" -and $_.PowerState -eq "PoweredOn" }
+    if ( $runningVM.Count -gt 0 ) {
         $runningVM | Stop-VM -Confirm:$false
-        Start-Sleep -Seconds 10
     }
     else {
-        Write-Host "No running VM!"
-    }
-    Write-Host "Shutdown Running vESXi"
-    $runningVM = Get-VM -Name "vesx*" | Where-Object { $_.PowerState -eq "PoweredOn" }
-    if ($runningVM.Count -eq 0) {
-        Write-Host "No running vEsxi!"
-    }
-    else {
-        Write-Host ("Stopping {0} virtual machines:" -f ($runningVM.Count - 1))
-        foreach ($vm in $runningVM) {
-            Stop-VM -VM $vm -Confirm:$false
-        }
-        Start-Sleep -Seconds 10
-    }
-    Write-Host "Stopping the physical ESXi"
-    $dc = Get-Datacenter -Name $datacenter
-    $pEsx = Get-VMHost -Location $dc | Where-Object { $_.Name -ne $vcenterHost -and $_.PowerState -eq "PoweredOn" }
-    if ($pEsx.Count -eq 0) {
-        Write-Host "No running physical ESXi"
-    }
-    else {
-        $pEsx.foreach{
-            Write-Host("Stop the host {0}" -f $_)
-            Stop-VMHost -VMHost $_ -Force -Confirm:$false
-        }
+        Write-Host "No running VM!" -ForegroundColor $ErrorColor
     }
 }
 else {
-    Write-Host "Connection to vCenter failed !"
+    Write-Host "Connection to vCenter failed !" -ForegroundColor $ErrorColor
 }
