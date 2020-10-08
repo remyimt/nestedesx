@@ -23,7 +23,7 @@ if ($oReturn) {
     }
     Write-Host "Delete the following VM:"
     $vms
-    Start-Sleep -Seconds 20
+    Start-Sleep -Seconds 5
     foreach ($v in $vms) {
         Remove-VM -VM $v -Confirm:$false
     }

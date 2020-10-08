@@ -47,6 +47,8 @@
     "always_datastore": "true",
     "ovf": "./Files/vesxtp-ovf/vesx-tp.ovf",
     "ovf_pwd": "superesx",
+    "student_ovf": "./NFS_Java/NFS/NFS_Java.ova",
+    "student_vm_name": "JavaNfs",
     "iso_prefix": "./Files/",
     "iso": []
   }
