@@ -39,7 +39,7 @@ while (!$oReturn) {
 # Check that required users exist
 $userIdx = 1
 $missingUsers = @()
-foreach ($dc in Get-Datacenter -Name ($basenameDC + "*")) {
+foreach ($dc in Get-Datacenter -Name ($basenameDC + "*") | Sort-Object -Property "Name") {
     $userName = "VSPHERE.LOCAL\" + $basenameUser + $userIdx++
     $oReturn = Get-VIAccount -Name $userName
     if (!$oReturn) {

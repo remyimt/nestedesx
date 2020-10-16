@@ -119,6 +119,7 @@ configuration afin de vérifier les informations. Pour plus de précision sur ce
 [cette section](#le-fichier-de-configuration)
 * Lancer le shell PowerShell : `pwsh`
 * Lancer le script de déploiement : `./deploy.ps1`
+  * Pour éviter le changement des mots de passe des vESXi, l'option `nopwd` peut être utilisée : `./deploy.ps1 nopwd`
 
 ##### Création d'utilisateurs ayant un accès restreint
 * Créer un nouvel utilisateur par centre de données commençant par *new_dc_basename*, c.-à-d., les centres de données

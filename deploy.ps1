@@ -92,6 +92,10 @@ try {
 catch [FormatException] {
     $vSanMode = $false
 }
+
+# Change vESXi passwords
+$updatePwd = !$args.contains('nopwd')
+
 # Add a default datastore to ESXi without datastore (true/false)
 try {
     $alwaysDatastore = [System.Convert]::ToBoolean($config.architecture.always_datastore)
@@ -332,21 +336,30 @@ $vesxIPs
 Wait-Hosts
 
 # Change vESXi password from 'superesx' to the password in the configuration file
-Write-Host ("Change {0} vESXi passwords" -f $vesxIPs.Count) -ForegroundColor $DefaultColor
-foreach($ip in $vesxIPs) {
-    try {
-        $server = Connect-VIServer -Server $ip -User $vConfig.user -Password $vEsxOVFpwd -NotDefault
-    }
-    catch {
-        Write-Host ("Can not connect to {0} with the default password '{1}'. Stop the deployment!" -f $ip, $vEsxOVFpwd) -ForegroundColor $ErrorColor
-        return
-    }
-    try {
-        Set-VMHostAccount -Server $server -UserAccount $vConfig.user -Password $vConfig.pwd
-        Write-Host ("{0} password changed" -f $ip) -ForegroundColor $DefaultColor
-    }
-    catch {
-        Write-Host ("Password modification failure: If the issue perists, please destroy the vESXi VM associated to {0}" -f $ip) -ForegroundColor $ErrorColor
+if ($updatePwd) {
+    Write-Host ("Change {0} vESXi passwords" -f $vesxIPs.Count) -ForegroundColor $DefaultColor
+    foreach($ip in $vesxIPs) {
+        try {
+            $server = Connect-VIServer -Server $ip -User $vConfig.user -Password $vEsxOVFpwd -NotDefault
+            try {
+                Set-VMHostAccount -Server $server -UserAccount $vConfig.user -Password $vConfig.pwd
+                Write-Host ("{0} password changed" -f $ip) -ForegroundColor $DefaultColor
+            }
+            catch {
+                Write-Host ("Password modification failure: If the issue perists, please destroy the vESXi VM associated to {0}" -f $ip) -ForegroundColor $ErrorColor
+            }
+        }
+        catch {
+            try {
+                # Try to connect with the new password (maybe the password has already been changed)
+                $server = Connect-VIServer -Server $ip -User $vConfig.user -Password $vConfig.pwd -NotDefault
+                Write-Host ("{0} new password is already set" -f $ip) -ForegroundColor $DefaultColor
+            }
+            catch {
+                Write-Host ("Can not connect to {0} with the default password '{1}'. Stop the deployment!" -f $ip, $vEsxOVFpwd) -ForegroundColor $ErrorColor
+                return
+            }
+        }
     }
 }
 
@@ -357,7 +370,7 @@ $newDC = @()
 if ($dcs.Count -lt $totalDc) {
     Write-Host "Create new datacenters" -ForegroundColor $DefaultColor
     for ($i = 1; ($newDC.Count + $dcs.Count) -lt $totalDc; $i++) {
-        $dcName = $basenameDC + $i
+        $dcName = $basenameDC + '{0:d2}' -f $i
         try {
             Get-Datacenter -Name $dcName | Out-Null
             Write-Host ("Datacenter {0} already exists" -f $dcName) -ForegroundColor $DefaultColor
