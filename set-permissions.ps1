@@ -1,6 +1,12 @@
 # The header reads the configuration file ($config variable)
 & "$PSScriptRoot/header.ps1"
 
+# Import the function NameFromMAC
+. ./my-functions.ps1
+
+# Every error stops the script immediately
+$ErrorActionPreference = "Stop"
+
 # vSphere Account
 $vcenterIp = $config.vcenter.ip
 $vcenterUser = $config.vcenter.user
@@ -11,15 +17,6 @@ $basenameDC = $config.architecture.new_dc_basename
 $vConfig = $config.virtual_esx
 # New user basename
 $basenameUser = $config.architecture.user_basename
-
-function NameFromMAC {
-    param (
-        [string]
-        $macAddr
-    )
-    $array = $macAddr.Split(":")
-    return $vConfig.basename + $array[4] + "_" + $array[5]
-}
 
 # Connection to vSphere
 Write-Host "+ Connecting to vSphere"

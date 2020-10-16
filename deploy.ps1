@@ -4,6 +4,9 @@ $ErrorActionPreference = "Stop"
 # The header reads the configuration file ($config variable)
 & "$PSScriptRoot/header.ps1"
 
+# Import the function NameFromMAC
+. ./my-functions.ps1
+
 #### Functions
 function Wait-Hosts {
     foreach ($vmh in (Get-VMHost | Where-Object { $_.ConnectionState -ne "Connected" })) {
@@ -15,15 +18,6 @@ function Wait-Hosts {
     }
 }
 
-# Copy this function to the file set-permissions.ps1
-function NameFromMAC {
-    param (
-        [string]
-        $macAddr
-    )
-    $array = $macAddr.Split(":")
-    return $vConfig.basename + ("{0:d3}" -f [int]("0x{0}" -f $array[5]))
-}
 function NameFromIP {
     param (
         [string]
@@ -32,6 +26,7 @@ function NameFromIP {
     $array = $ipAddr.Split(".")
     return "vDatastore" + $array[2] + "_" + $array[3]
 }
+
 function Get-VMFromHost {
     param (
         [VMware.VimAutomation.ViCore.Types.V1.Inventory.VMHost]
