@@ -4,6 +4,9 @@ $ErrorActionPreference = "Stop"
 # The header reads the configuration file ($config variable)
 & "$PSScriptRoot/header.ps1"
 
+# Import the function uselessVM
+. ./my-functions.ps1
+
 # vSphere Account
 $vcenterIp = $config.vcenter.ip
 $vcenterUser = $config.vcenter.user
@@ -33,9 +36,7 @@ Write-Host "Connect all ESXi in maintenance mode:" -ForegroundColor $DefaultColo
 Get-VMHost | Where-Object { $_.ConnectionState -eq "Maintenance" } | Set-VMHost -State "Connected"
 
 Write-Host "Select all student VM:" -ForegroundColor $DefaultColor
-$vms = Get-VM | Where-Object { $_.Name -notlike "nsx*" -and $_.Name -notlike "vesx*" -and `
-    $_.Name -notlike "Embedded*" -and $_.Name -notlike "Manager*" -and $_.Name -notlike "vyos*" `
-    -and (Get-VMHost -VM $_).ConnectionState -eq "Connected" }
+$vms = uselessVM 'vesx'
 $vms
 Write-Host "Remove orphaned VM:" -ForegroundColor $DefaultColor
 $orphaned = $vms | Where {$_.ExtensionData.Summary.Runtime.ConnectionState -eq "orphaned"}
@@ -45,7 +46,7 @@ Write-Host "Delete Student VM:" -ForegroundColor $DefaultColor
 $vms | Where-Object { $_.PowerState -eq "PoweredOn" } | Stop-VM -Confirm:$false
 $vms | Remove-VM -DeletePermanently -Confirm:$false
 Write-Host "Delete vESXi VM:" -ForegroundColor $DefaultColor
-$vms = Get-VM | Where-Object { $_.Name -notlike "nsx*" -and $_.Name -like "vesx*" -and $_.Name -notlike "Embedded*" -and $_.Name -notlike "Manager*" -and $_.Name -notlike "vyos*"}
+$vms = uselessVM
 $vms
 $vms | Where-Object { $_.PowerState -eq "PoweredOn" } | Stop-VM -Confirm:$false
 $vms | Remove-VM -DeletePermanently -Confirm:$false

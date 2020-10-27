@@ -1,6 +1,9 @@
 # The header reads the configuration file ($config variable)
 & "$PSScriptRoot/header.ps1"
 
+# Import the function uselessVM
+. ./my-functions.ps1
+
 # vSphere Account
 $vcenterIp = $config.vcenter.ip
 $vcenterUser = $config.vcenter.user
@@ -19,7 +22,7 @@ Write-Host "Connecting to vSphere" -ForegroundColor $DefaultColor
 $oReturn = Connect-VIServer -Server $vcenterIp -User $vcenterUser -Password $vcenterPwd
 if ($oReturn) {
     Write-Host "Shutdown Running VM" -ForegroundColor $DefaultColor
-    $runningVM = Get-VM -Location $esxName | Where-Object { $_.Name -notlike "nsx*" -and $_.Name -notlike "Manager*" -and $_.Name -notlike "Embedded*" -and $_.Name -notlike "vyos*" -and $_.PowerState -eq "PoweredOn" }
+    $runningVM = uselessVM | Where-Object { $_.PowerState -eq "PoweredOn" }
     if ( $runningVM.Count -gt 0 ) {
         $runningVM | Stop-VM -Confirm:$false
     }
