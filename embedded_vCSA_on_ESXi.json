@@ -3,11 +3,11 @@
     "__comments": "Sample template to deploy a vCenter Server Appliance with an embedded Platform Services Controller on an ESXi host.",
     "new_vcsa": {
         "esxi": {
-            "hostname": "192.168.3.1",
+            "hostname": "192.168.1.91",
             "username": "root",
-            "password": "tototiti",
-            "deployment_network": "internal-network",
-            "datastore": "datastore1"
+            "password": "esxi_pwd",
+            "deployment_network": "VM Network",
+            "datastore": "datastore1 (2)"
         },
         "appliance": {
             "__comments": [
@@ -15,26 +15,26 @@
             ],
             "thin_disk_mode": true,
             "deployment_option": "small",
-            "name": "Embedded-vCenter-Server-Appliance"
+            "name": "vCenter"
         },
         "network": {
             "ip_family": "ipv4",
             "mode": "static",
             "ip": "192.168.3.252",
             "dns_servers": [
-                "192.168.3.254"
+                "8.8.8.8"
             ],
             "prefix": "24",
-            "gateway": "192.168.3.254",
+            "gateway": "192.168.3.251",
             "system_name": "192.168.3.252"
         },
         "os": {
-            "password": "toTO12**",
+            "password": "vsphere_pwd",
             "ntp_servers": "fr.pool.ntp.org",
             "ssh_enable": false
         },
         "sso": {
-            "password": "tiTI12**",
+            "password": "admin_pwd",
             "domain_name": "vsphere.local"
         }
     },
