@@ -214,6 +214,8 @@ sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf
 /sbin/auto-backup.sh
 poweroff
 ```
+* Activer le *SSH client* à partir de l'interface web de l'ESXi
+  * Networking > Firewall Rules > SSH client > Enable
 * Création de l'OVF à partir d'un shell PowerShell (la connexion au vCenter doit être exécutée au préalable *vcenter-connect.ps1*)
   * `Get-VM -Name "vesx1" | Export-VApp -Destination vesx-ovf -Force`
 
@@ -297,6 +299,15 @@ home
 * Install SSH on tinyCore: https://iotbytes.wordpress.com/configure-ssh-server-on-microcore-tiny-linux/
 
 ### Troubleshooting
+#### Enable SSH connections FROM ESXi
+* From vSphere
+  * Select the ESXi Host
+  * Configure > System > Firewall
+  * Edit
+  * Tick SSH Client
+* From the ESXi Web UI
+  * Networking > Firewall Rules
+  * Right click on SSH client > Enable
 #### Recurrent errors with PowerShell
 * PowerCLI error: Operation is not valid due to the current state of the object.
   * Quitter PowerShell et relancer PowerShell
