@@ -33,40 +33,49 @@ while (!$oReturn) {
     }
 }
 
-# Get the running ESXi VM (vESXi)
-$onVesx = Get-VM -Name ($vConfig.basename + "*") | Where-Object { $_.PowerState -eq "PoweredOn" } | Sort-Object -Property "Name"
+# Create a new VM on every vESXi (ESXi VM)
+$vmhs = @()
+# Get all VMHost associated to running vESXi
+#$onVesx = Get-VM -Name ($vConfig.basename + "*") | Where-Object { $_.PowerState -eq "PoweredOn" } | Sort-Object -Property "Name"
+#foreach ($v in $onVesx) {
+#        Write-Host ("Get the vESXi associated to {0}" -f $v) -ForegroundColor $DefaultColor
+#        $esxName = $v.Guest.IPAddress[0]
+#        try {
+#            $myVM = Get-VM -Name ($studentVMName + "*") -Location $esxName
+#            if ( $myVM.Count -eq 0 ) {
+#                $vmh = Get-VMHost -Name $esxName
+#                if ( $vmh.ConnectionState -eq "Connected" ) {
+#                    $vmhs += $vmh
+#                }
+#            }
+#        } catch {
+#            Write-Host $_.Exception.Message -ForegroundColor $ErrorColor
+#            Write-Host ("vESXi {0} does not exist: run './deploy.ps1" -f $esxName) -ForegroundColor $ErrorColor
+#        }
+#}
 
+# Create a new VM on every student datacenter
+$vmhs = @()
+# Get one running ESXi VM (vESXi) per datacenter
+Get-Datacenter -Name ($config.architecture.new_dc_basename + "*") | ForEach-Object { $vmhs += Get-VMHost -Location $_ | Select-Object -First 1 }
 
-# Create one student VM on every vESXi
-$nbStudentVM = (Get-VM -Name ($studentVMName + "*")).Count
-foreach ($v in $onVesx) {
-        Write-Host ("Get the vESXi associated to {0}" -f $v) -ForegroundColor $DefaultColor
-        $esxName = $v.Guest.IPAddress[0]
-        try {
-            $myVM = Get-VM -Name ($studentVMName + "*") -Location $esxName
-            if ( $myVM.Count -eq 0 ) {
-                $vmh = Get-VMHost -Name $esxName
-                if ( $vmh.ConnectionState -eq "Connected" ) {
-                    $nbStudentVM++
-                    Write-Host ("Create the student VM on {0}" -f $esxName) -ForegroundColor $DefaultColor
-                    if ($createFromClone) {
-                        # Create the student VM from an existing VM
-                        $studentVM = New-VM -VM $cloneSrc -VMHost $vmh -Name ($studentVMName + $nbStudentVM) -DiskStorageFormat Thin
-                    }
-                    else {
-                        # Create the student VM from OVF
-                        $studentVM = Import-vApp -Source $studentOVF -VMHost $vmh -Name ($studentVMName + $nbStudentVM) -DiskStorageFormat Thin
-                        $createFromClone = $true
-                        $cloneSrc = $studentVM
-                    }
-                } else {
-                    Write-Host ("vESXi {0} is not connected!" -f $esxName) -ForegroundColor $ErrorColor
-                }
-            } else {
-                    Write-Host ("Student {0} already exists!" -f $studentVMName) -ForegroundColor $ErrorColor
-            }
-        } catch {
-            Write-Host $_.Exception.Message -ForegroundColor $ErrorColor
-            Write-Host ("vESXi {0} does not exist: run './deploy.ps1" -f $esxName) -ForegroundColor $ErrorColor
+# Create one student VM on every selected vESXi
+$nbStudentVM = 0
+foreach ($vmh in $vmhs) {
+    if ( $vmh.ConnectionState -eq "Connected" ) {
+        $nbStudentVM++
+        Write-Host ("Create the student VM on {0}" -f $vmh.Name) -ForegroundColor $DefaultColor
+        if ($createFromClone) {
+            # Create the student VM from an existing VM
+            $studentVM = New-VM -VM $cloneSrc -VMHost $vmh -Name ($studentVMName + $nbStudentVM) -DiskStorageFormat Thin
         }
+        else {
+            # Create the student VM from OVF
+            $studentVM = Import-vApp -Source $studentOVF -VMHost $vmh -Name ($studentVMName + $nbStudentVM) -DiskStorageFormat Thin
+            $createFromClone = $true
+            $cloneSrc = $studentVM
+        }
+    } else {
+        Write-Host ("vESXi {0} is not connected!" -f $vmh.Name) -ForegroundColor $ErrorColor
+    }
 }
