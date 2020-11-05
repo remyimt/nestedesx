@@ -104,6 +104,16 @@ catch [FormatException] {
     $alwaysDatastore = $false
 }
 
+# Select the smallest or the largest disk to create the datastore
+if($config.architecture.datastore_size -eq "smallest") {
+    $smallestDatastore = $true
+} else {
+    $smallestDatastore = $false
+}
+
+if($alwaysDatastore -and $vSanMode -and !$smallestDatastore) {
+    Write-Host("To create vSan storage, you must create the default datastore with the smallest disk. In the configuration file, set 'datastore_size' to 'smallest'!") -ForegroundColor $ErrorColor
+}
 $totalVesx = 0
 # Check the vESXi information from the configuration file
 if ($vSanMode) {
@@ -399,10 +409,11 @@ foreach ($dc in Get-Datacenter -Name ($basenameDC + "*")) {
         $dsName = NameFromIP($vesxIPs[$availableIdx])
         if ($ds.Count -gt 0 -and $ds[0].Name -ne $dsName) {
             # Update the datastore ID to an unique ID
+            $disk = $ds[0] | Get-ScsiLun
             Write-Host ("Removing the datastore of {0}" -f $vmh) -ForegroundColor $DefaultColor
             Remove-Datastore -VMHost $vmh -Datastore $ds[0] -Confirm:$false | Out-Null
             Write-Host ("Creating a new datastore for {0}" -f $vmh) -ForegroundColor $DefaultColor
-            New-Datastore -VMHost $vmh -Name $dsName -Path mpx.vmhba0:C0:T0:L0 -Vmfs -Confirm:$false | Out-Null
+            New-Datastore -VMHost $vmh -Name $dsName -Path $disk.CanonicalName -Vmfs -Confirm:$false | Out-Null
         }
     }
 }
@@ -416,8 +427,15 @@ if ($alwaysDatastore) {
             Write-Host ("Configuring the datastore of {0}" -f $esx) -ForegroundColor $DefaultColor
             $ds = Get-Datastore -VMHost $esx
             if ($ds.Count -eq 0) {
-                # Create a datastore from the smallest disk
-                $disks = Get-VMHostDisk -VMHost $esx | Sort-Object -Property TotalSectors
+                if($smallestDatastore) {
+                    # Create a datastore from the smallest disk
+                    $disks = Get-VMHostDisk -VMHost $esx | Sort-Object -Property TotalSectors
+                    Write-Host ("Select the smallest disk. Disk size: {0} GB" -f ($disks[0].TotalSectors / 2097152)) -ForegroundColor $DefaultColor
+                } else {
+                    # Create a datastore from the largest disk
+                    $disks = Get-VMHostDisk -VMHost $esx | Sort-Object -Property TotalSectors -Descending
+                    Write-Host ("Select the largest disk. Disk size: {0} GB" -f ($disks[0].TotalSectors / 2097152)) -ForegroundColor $DefaultColor
+                }
                 $dsName = NameFromIP($esx.Name)
                 New-Datastore -VMHost $esx -Name $dsName -Path $disks[0].ScsiLun -Vmfs -Confirm:$false | Out-Null
             }

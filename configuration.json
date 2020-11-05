@@ -45,6 +45,8 @@
     "nb_vesx_datacenter": 3,
     "vsan": "false",
     "always_datastore": "true",
+    "datastore_size_values": "smallest or largest",
+    "datastore_size": "smallest",
     "ovf": "./Files/vesxtp-ovf/vesx-tp.ovf",
     "ovf_pwd": "superesx",
     "student_ovf": "./NFS_Java/NFS/NFS_Java.ova",
