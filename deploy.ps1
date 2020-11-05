@@ -340,7 +340,11 @@ foreach ($vesx in $onVesx) {
     Start-Sleep -Milliseconds 300
 }
 Write-Host ("Available vESXi: ") -ForegroundColor $DefaultColor
-$vesxIPs = $vesxIPs | Sort-Object -Property "last" | Select-Object -ExpandProperty ip
+if ($vesxIPs.Count -eq 1) {
+    $vesxIPs = @( $vesxIPs[0].ip )
+} else {
+    $vesxIPs = $vesxIPs | Sort-Object -Property "last" | Select-Object -ExpandProperty ip
+}
 $vesxIPs
 
 Wait-Hosts
