@@ -551,3 +551,7 @@ if ($iso.Count -gt 0 -and $ds.Count -gt 0) {
 
 # Disable maintenance mode on vESXi (sometimes, vESXi stay in maintenance mode)
 Get-VMHost | Where-Object { $_.ConnectionState -eq "Maintenance" } | Set-VMHost -State "Connected"
+
+# Enable the SSH server and the SSH client of both the vESXi and the ESXi
+Get-VMHost | Get-VMHostFirewallException -Name "SSH Server" -Enabled:$false | Set-VMHostFirewallException -Enabled:$true
+Get-VMHost | Get-VMHostFirewallException -Name "SSH Client" -Enabled:$false | Set-VMHostFirewallException -Enabled:$true
