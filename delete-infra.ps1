@@ -35,34 +35,10 @@ while (!$oReturn) {
 Write-Host "Connect all ESXi in maintenance mode:" -ForegroundColor $DefaultColor
 Get-VMHost | Where-Object { $_.ConnectionState -eq "Maintenance" } | Set-VMHost -State "Connected"
 
-Write-Host "Select all student VM:" -ForegroundColor $DefaultColor
-$vms = uselessVM 'vesx'
-$vms
-Write-Host "Remove orphaned VM:" -ForegroundColor $DefaultColor
-$orphaned = $vms | Where {$_.ExtensionData.Summary.Runtime.ConnectionState -eq "orphaned"}
-$orphaned | Remove-VM -Confirm:$false
-$vms = $vms | Where { $orphaned -notcontains $_ }
-Write-Host "Delete Student VM:" -ForegroundColor $DefaultColor
-$vms | Where-Object { $_.PowerState -eq "PoweredOn" } | Stop-VM -Confirm:$false
-$vms | Remove-VM -DeletePermanently -Confirm:$false
-Write-Host "Delete vESXi VM:" -ForegroundColor $DefaultColor
-$vms = uselessVM
-$vms
-$vms | Where-Object { $_.PowerState -eq "PoweredOn" } | Stop-VM -Confirm:$false
-$vms | Remove-VM -DeletePermanently -Confirm:$false
-Write-Host "Waiting for vESXi losing their connection" -ForegroundColor $DefaultColor
-foreach ($dc in (Get-Datacenter -Name ($basenameDC + "*"))) {
-    foreach ($vmh in (Get-VMHost -Location $dc)) {
-        while ($vmh.ConnectionState -ne "NotResponding") {
-            Write-Host ("The vESXi {0} is connected. Waiting for the disconnection..." -f $vmh)
-            Start-Sleep -Seconds 10
-            $vmh = Get-VMHost -Name $vmh.Name
-        }
-        Write-Host ("Remove vESXi {0} from Inventory" -f $vmh) -ForegroundColor $DefaultColor
-        Remove-VMHost -VMHost $vmh -Confirm:$false
-    }
-}
-Write-Host "Remove clusters" -ForegroundColor $DefaultColor
-Get-Cluster | Remove-Cluster -Confirm:$false
 Write-Host "Remove Student Datacenters" -ForegroundColor $DefaultColor
 Get-Datacenter -Name ($basenameDC + "*") | Remove-Datacenter -Confirm:$false
+
+Write-Host "Delete vESXi VM:" -ForegroundColor $DefaultColor
+$vms = uselessVM
+$vms | Where-Object { $_.PowerState -eq "PoweredOn" } | Stop-VM -Confirm:$false
+$vms | Remove-VM -DeletePermanently -Confirm:$false
