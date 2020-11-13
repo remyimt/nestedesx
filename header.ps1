@@ -3,7 +3,7 @@ $config_path = $PSScriptRoot + "/configuration.json"
 Write-Host ("Config path: {0}" -f $PSScriptRoot)
 
 # Beautiful colors
-$global:DefaultColor = "DarkGray"
+$global:DefaultColor = "White"
 $global:ErrorColor = "Red"
 
 # Manage wrong certificate errors
