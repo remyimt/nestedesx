@@ -62,20 +62,26 @@ Get-Datacenter -Name ($config.architecture.new_dc_basename + "*") | ForEach-Obje
 # Create one student VM on every selected vESXi
 $nbStudentVM = 0
 foreach ($vmh in $vmhs) {
-    if ( $vmh.ConnectionState -eq "Connected" ) {
-        $nbStudentVM++
-        Write-Host ("Create the student VM on {0}" -f $vmh.Name) -ForegroundColor $DefaultColor
-        if ($createFromClone) {
-            # Create the student VM from an existing VM
-            $studentVM = New-VM -VM $cloneSrc -VMHost $vmh -Name ($studentVMName + $nbStudentVM) -DiskStorageFormat Thin
+    $nbStudentVM++
+    try {
+        $myvm = Get-VM -Name ($studentVMName + $nbStudentVM)
+        Write-Host ("VM {0} already exists!" -f $myvm.Name) -ForegroundColor $DefaultColor
+    }
+    catch {
+        if ($vmh.ConnectionState -eq "Connected") {
+            Write-Host ("Create the student VM on {0}" -f $vmh.Name) -ForegroundColor $DefaultColor
+            if ($createFromClone) {
+                # Create the student VM from an existing VM
+                $studentVM = New-VM -VM $cloneSrc -VMHost $vmh -Name ($studentVMName + $nbStudentVM) -DiskStorageFormat Thin
+            }
+            else {
+                # Create the student VM from OVF
+                $studentVM = Import-vApp -Source $studentOVF -VMHost $vmh -Name ($studentVMName + $nbStudentVM) -DiskStorageFormat Thin
+                $createFromClone = $true
+                $cloneSrc = $studentVM
+            }
+        } else {
+            Write-Host ("vESXi {0} is not connected!" -f $vmh.Name) -ForegroundColor $ErrorColor
         }
-        else {
-            # Create the student VM from OVF
-            $studentVM = Import-vApp -Source $studentOVF -VMHost $vmh -Name ($studentVMName + $nbStudentVM) -DiskStorageFormat Thin
-            $createFromClone = $true
-            $cloneSrc = $studentVM
-        }
-    } else {
-        Write-Host ("vESXi {0} is not connected!" -f $vmh.Name) -ForegroundColor $ErrorColor
     }
 }
