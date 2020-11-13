@@ -14,20 +14,14 @@ $vcenterPwd = $config.vcenter.pwd
 
 $oReturn = Connect-VIServer -Server $vcenterIp -User $vcenterUser -Password $vcenterPwd
 if ($oReturn) {
+    Write-Host "Select all student VM:" -ForegroundColor $DefaultColor
     $vms = uselessVM 'vesx'
-    Write-Host ("Detecting {0} VM to delete:" -f $vms.Count)
     $vms
-    Start-Sleep -Seconds 5
-    foreach ($v in $vms) {
-        if ($v.PowerState -eq "PoweredOn") {
-            Write-Host "Stopping the VM $v"
-            Stop-VM -VM $v -Confirm:$false
-        }
-    }
-    Write-Host "Delete the following VM:"
-    $vms
-    Start-Sleep -Seconds 5
-    foreach ($v in $vms) {
-        Remove-VM -VM $v -Confirm:$false
-    }
+    Write-Host "Remove orphaned VM:" -ForegroundColor $DefaultColor
+    $orphaned = $vms | Where {$_.ExtensionData.Summary.Runtime.ConnectionState -eq "orphaned"}
+    $orphaned | Remove-VM -Confirm:$false
+    $vms = $vms | Where { $orphaned -notcontains $_ }
+    Write-Host "Delete Student VM:" -ForegroundColor $DefaultColor
+    $vms | Where-Object { $_.PowerState -eq "PoweredOn" } | Stop-VM -Confirm:$false
+    $vms | Remove-VM -DeletePermanently -Confirm:$false
 }
