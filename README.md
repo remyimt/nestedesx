@@ -219,51 +219,73 @@ poweroff
 * Création de l'OVF à partir d'un shell PowerShell (la connexion au vCenter doit être exécutée au préalable *vcenter-connect.ps1*)
   * `Get-VM -Name "vesx1" | Export-VApp -Destination vesx-ovf -Force`
 
-#### Création de l'OVF d'une distribution tinyCore à partir de l'ISO *tinycore.iso*
+#### Création de l'OVF d'une distribution tinyCore à partir de l'ISO *corePure64-11.1.iso*
+##### NOTE sur l'utilisation de la console VMware
+```
+ : -> Shift + m
+ _ -> Shitf + )
+ ! -> Shitf + &
+ - -> )
+ . -> :
+ / -> !
+ ```
+##### Création de la tinyVM
+* Télécharger l'[iso](http://repo.tinycorelinux.net/11.x/x86_64/release/) sur le datastore
+* Créer une machine virtuelle
+  * type: **Linux/CoreOS**
+  * mémoire : 256 MB
+  * disque: 500 MB (storage: **Thin**)
+  * type de disque: **SCSI** (requis pour la tolérance aux pannes)
+  * CDROM: datastore ISO - core-11.1.iso
 * Installation de tinyCore sur le disque dur
-  * Créer une VM avec 256 MB de mémoire, 200 MB de disque. Le disque doit être un **disque IDE**.
   * Démarrer la VM et booter sur l'ISO
   * `tce-load -wi tc-install`
-  * `sudo tc-install.sh` : c - cd-rom, f - Frugal, 1 - Whole disk
-  * Éteindre la VM et retirer l'ISO
+  * `sudo tc-install.sh`
+  ```
+  c - cd-rom
+  f - Frugal
+  1 - Whole disk
+  y - bootloader
+  enter - install extensions
+  3 - formatting option
+  enter - boot options
+  y - last chance
+  ```
+* Éteindre la VM
+* Éditer la configuration matérielle et retirer le lecteur CD
+* Allumer la VM
+* Créer un mot de passe pour l'utilisateur 'tc' : `sudo passwd tc`
+  * Mot de passe : imt
 * Installation du serveur SSH
-  * Créer un mot de passe pour l'utilisateur 'tc' : `passwd`
-  * Mot de passe : tiny00PWD
   ```
   tce-install -wi openssh
   cd /usr/local/etc/ssh/
   sudo cp sshd_config.orig sshd_config
   sudo /usr/local/etc/init.d/openssh start
   ```
-  * lancement du service au démarrage `vim /opt/bootlocal.sh`
+* (Facultatif) Ajouter une clé SSH dans `/home/tc/.ssh/authorized_keys`
+* Modifier la liste des répertoires à sauvegarder dans `/opt/.filetool.lst`
+```
+opt
+home
+/usr/local/etc/ssh
+/etc/shadow
+/home/tc/.ssh/
+```
+* Installation des VMware Tools `tce-load -wi open-vm-tools-desktop`
+  * une erreur à propos du fichier *fuse.conf* s'affiche
+* Configuration des services à lancer au démarrage dans `/opt/bootlocal.sh`
 ```
 #!/bin/sh
 # put other system startup commands here
 /usr/local/etc/init.d/openssh start
+/usr/local/etc/init.d/open-vm-tools start
 ```
-  * Sauvegarder les modifications : `filetool.sh -b`
-* Installation des VMware Tools
-  * `tce-load -wi open-vm-tools-desktop`
-  * Ajouter la ligne `/usr/local/etc/init.d/open-vm-tools start` au fichier `/opt/bootlocal.sh`
-  * `filetool.sh -b`
-* Sauvegarder les modifications sur le disque
-  * `vim /opt/.filetool.lst`
-```
-opt
-home
-/etc/shadow
-/usr/local/etc/ssh
-```
-  * `sudo vim /opt/bootlocal.sh`
-```
-/usr/local/etc/init.d/openssh start
-```
-  * `filetool.sh -b`
 * Installation de l'outil de stress
   * Copier le fichier `stress.tcz` dans la VM via scp par exemple
   * Déplacer le fichier vers le répertoire `/mnt/sda1/tce/optional/`
   * Ajouter la ligne `stress.tcz` dans le fichier `/mnt/sda1/tce/onboot.lst`
-  * `filetool.sh -b`
+* Sauvegarde du disque dur `filetool.sh -b`
 
 ### Arrêt automatique du cluster
 * Configuration des accès SSH des ESXi
