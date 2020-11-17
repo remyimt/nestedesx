@@ -299,6 +299,23 @@ home
 * Install SSH on tinyCore: https://iotbytes.wordpress.com/configure-ssh-server-on-microcore-tiny-linux/
 
 ### Troubleshooting
+#### Size of the vSan storage is incorrect
+* Description: After creating the vSan datastore without error, the size of the datastore is less than the expected
+  size.
+  * instead of 120 GB (3 hosts x 40  GB) the size is (1 host x 40 GB) or (2 hosts x 40) GB
+  * the system complains about missing backup nodes or missing fault tolerant domains
+  * Compare the local Nnode UUID of ESXi with `esxcli vsan cluster get`
+  * UUID must be unique
+* Check the UUID of the ESXi
+  * From powerCLI:
+  ```
+  Get-VMHost | Select Name, @{N='HW BIOS Uuid';E={$_.Extensiondata.Hardware.SystemInfo.Uuid}}, @{N='ESXi System UUid';E={(Get-Esxcli -VMHost $_).system.uuid.get()}}
+  ```
+  * From ESXi cli: `esxcli vsan cluster get`
+  * The UUID must be unique. Delete the line *system/uuid* of the file `/etc/vmware/esx.conf`
+  * Reboot the ESXi
+* Take a look at the script `change-uuid.sh` and the file `uuid-hosts.txt`
+
 #### Enable SSH connections FROM ESXi
 * From vSphere
   * Select the ESXi Host
@@ -308,6 +325,7 @@ home
 * From the ESXi Web UI
   * Networking > Firewall Rules
   * Right click on SSH client > Enable
+
 #### Recurrent errors with PowerShell
 * PowerCLI error: Operation is not valid due to the current state of the object.
   * Quitter PowerShell et relancer PowerShell
