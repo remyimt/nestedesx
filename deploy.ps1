@@ -553,5 +553,6 @@ if ($iso.Count -gt 0 -and $ds.Count -gt 0) {
 Get-VMHost | Where-Object { $_.ConnectionState -eq "Maintenance" } | Set-VMHost -State "Connected"
 
 # Enable the SSH server and the SSH client of both the vESXi and the ESXi
+Get-VMHost | Get-VMHostService | Where { $_.Key -eq "TSM-SSH" -and ! $_.Running} | Start-VMHostService
 Get-VMHost | Get-VMHostFirewallException -Name "SSH Server" -Enabled:$false | Set-VMHostFirewallException -Enabled:$true
 Get-VMHost | Get-VMHostFirewallException -Name "SSH Client" -Enabled:$false | Set-VMHostFirewallException -Enabled:$true
