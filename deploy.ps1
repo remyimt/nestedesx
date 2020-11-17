@@ -113,6 +113,7 @@ if($config.architecture.datastore_size -eq "smallest") {
 
 if($alwaysDatastore -and $vSanMode -and !$smallestDatastore) {
     Write-Host("To create vSan storage, you must create the default datastore with the smallest disk. In the configuration file, set 'datastore_size' to 'smallest'!") -ForegroundColor $ErrorColor
+    return
 }
 $totalVesx = 0
 # Check the vESXi information from the configuration file
@@ -271,6 +272,7 @@ Get-VMHost | Where-Object { $_.ConnectionState -eq "Maintenance" } | Set-VMHost 
 # Retrieve all MAC used by the existing vESXi
 $existingMacs = Get-VM -Name ($vConfig.basename + "*") | Get-NetworkAdapter | Select-Object -Property MacAddress
 # Create ESXi VM (vESXi) in the infrastructure
+$newVesx = @()
 foreach ($e in $esxConfig) {
     $onVesx = Get-VM -Name ($vConfig.basename + "*") -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" }
     $offVesx = Get-VM -Name ($vConfig.basename + "*") -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOff" } | Sort-Object
@@ -303,14 +305,16 @@ foreach ($e in $esxConfig) {
         }
         # Set the MAC address
         $vesx | Get-NetworkAdapter | Set-NetworkAdapter -MacAddress $macStr -Confirm:$false -StartConnected:$true | Out-Null
-        # Power on the vESXi
-        Write-Host ("Power on the VM " + $nameStr) -ForegroundColor $DefaultColor
-        $vesx | Start-VM | Out-Null
-        Start-Sleep -Seconds 1
         $existingMacs += $macStr
+        $newVesx += $vesx
     }
-    $onVesx = Get-VM -Name ($vConfig.basename + "*") -Location $ip2obj[$e.ip] | Where-Object { $_.PowerState -eq "PoweredOn" }
 }
+
+# Power on the recently created vESXi
+# WARNING: Do not start the VM used for the cloning operation, the UUID would be set and cloned!
+Write-Host ("Power on {0} VM " -f $newVesx.Count) -ForegroundColor $DefaultColor
+$newVesx | Start-VM
+Start-Sleep -Seconds 2
 
 $onVesx = Get-VM -Name ($vConfig.basename + "*") | Where-Object { $_.PowerState -eq "PoweredOn" }
 Write-Host ("Check connection of {0} vESXi" -f $onVesx.Count) -ForegroundColor $DefaultColor
@@ -493,15 +497,13 @@ if ($vSanMode) {
             }
         }
         if (!$cl.VsanEnabled) {
-            Write-Host ("Configuring the vSan for the cluster {0}" -f ("vSan" + $d.Name)) -ForegroundColor $DefaultColor
+            Write-Host ("Configuring the vSan for the cluster {0}" -f $cl.Name) -ForegroundColor $DefaultColor
             Set-Cluster -Cluster $cl -VsanEnabled:$true -Confirm:$false | Out-Null
             # Get the number at the end of the cluster name
             $cl.Name -match "(\d+)$" | Out-Null
             $dsName = "vsanDatastore" + $Matches[1]
             # Rename the datastore
-            if ($cl.Name -ne $dsName) {
-                $cl | Get-Datastore -Name "vsan*" | Set-Datastore -Name $dsName | Out-Null
-            }
+            $cl | Get-Datastore -Name "vsan*" | Set-Datastore -Name $dsName | Out-Null
         }
     }
 }
