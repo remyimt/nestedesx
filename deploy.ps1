@@ -309,7 +309,9 @@ foreach ($e in $esxConfig) {
         else {
             # Create the vESXi from OVF
             $ovfConfig = Get-OvfConfiguration $vEsxOVF
-            $ovfConfig.NetworkMapping.VM_Network.Value = $vConfig.network
+            # Link the adapter to the network name in the configuration file
+            $netName = $ovfConfig.NetworkMapping | Select-Object -First 1 | Get-Member -MemberType CodeProperty
+            $ovfConfig.NetworkMapping.$($netName.Name).Value = $vConfig.network
             $vesx = Import-vApp -Source $vEsxOVF -VMHost $ip2obj[$e.ip] -Name $nameStr -DiskStorageFormat Thin -OvfConfiguration $ovfConfig
             $createFromClone = $true
             $cloneSrc = $vesx
