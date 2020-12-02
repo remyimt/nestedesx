@@ -175,6 +175,15 @@ if ($missing.Count -gt 0) {
         return
     }
 }
+
+Write-Host("Looking for the vESXi Network '{0}'" -f $vConfig.network) -ForegroundColor $DefaultColor
+try {
+    $networks = Get-VirtualNetwork -Name $vConfig.network
+} catch {
+    Write-Host("Network '{0}' does not exist!" -f $vConfig.network) -ForegroundColor $ErrorColor
+    return
+}
+
 Write-Host "Retrieve the datacenter $datacenter" -ForegroundColor $DefaultColor
 try {
     $dc = Get-Datacenter -Name $datacenter
@@ -299,7 +308,9 @@ foreach ($e in $esxConfig) {
         }
         else {
             # Create the vESXi from OVF
-            $vesx = Import-vApp -Source $vEsxOVF -VMHost $ip2obj[$e.ip] -Name $nameStr -DiskStorageFormat Thin
+            $ovfConfig = Get-OvfConfiguration $vEsxOVF
+            $ovfConfig.NetworkMapping.VM_Network.Value = $vConfig.network
+            $vesx = Import-vApp -Source $vEsxOVF -VMHost $ip2obj[$e.ip] -Name $nameStr -DiskStorageFormat Thin -OvfConfiguration $ovfConfig
             $createFromClone = $true
             $cloneSrc = $vesx
         }

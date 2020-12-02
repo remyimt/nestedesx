@@ -34,6 +34,7 @@
   "virtual_esx": {
     "user": "root",
     "pwd": "VESXPWD",
+    "network": "VM Network",
     "basename": "vesx"
   },
   "architecture": {
