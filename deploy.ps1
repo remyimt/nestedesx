@@ -317,7 +317,11 @@ foreach ($e in $esxConfig) {
             $cloneSrc = $vesx
         }
         # Set the MAC address
-        $vesx | Get-NetworkAdapter | Set-NetworkAdapter -MacAddress $macStr -Confirm:$false -StartConnected:$true | Out-Null
+        $netAdap = $vesx | Get-NetworkAdapter
+        for($net_i = 0; $net_i -lt $netAdap.Count; $net_i++) {
+            $newMac = $macStr -replace ":02:", (":{0}2:" -f $net_i)
+            $netAdap[$net_i] | Set-NetworkAdapter -MacAddress $newMac -Confirm:$false -StartConnected:$true | Out-Null
+        }
         $existingMacs += $macStr
         $newVesx += $vesx
     }
