@@ -220,7 +220,7 @@ poweroff
   * `Get-VM -Name "vesx1" | Export-VApp -Destination vesx-ovf -Force`
 
 #### Création de l'OVF d'une distribution tinyCore à partir de l'ISO *corePure64-11.1.iso*
-##### NOTE sur l'utilisation de la console VMware
+##### NOTE sur l'utilisation de la console VMware (clavier qwerty)
 ```
  : -> Shift + m
  _ -> Shitf + )
@@ -228,6 +228,7 @@ poweroff
  - -> )
  . -> :
  / -> !
+ ; -> m
  ```
 ##### Création de la tinyVM
 * Télécharger l'[iso](http://repo.tinycorelinux.net/11.x/x86_64/release/) sur le datastore

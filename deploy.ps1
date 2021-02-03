@@ -116,7 +116,6 @@ if($alwaysDatastore -and $vSanMode -and !$smallestDatastore) {
     return
 }
 $totalVesx = 0
-# Check the vESXi information from the configuration file
 if ($vSanMode) {
     if ($nbEsxPerDC -lt 3) {
         Write-Host("The minimum number of ESXi in vSan clusters is 3. Please, disable the vSan mode or increase the number of vESX per datacenter (nb_vesx_datacenter)") -ForegroundColor $ErrorColor
@@ -131,7 +130,7 @@ if ($totalVesx -gt $config.architecture.dhcp_max_addr) {
     return
 }
 if ($totalVesx % $nbEsxPerDC -ne 0) {
-    Write-Host ("The vESXi can not be fairly distributed on datacenters. Total vESXi : {0}" -f $totalVesx) -ForegroundColor $ErrorColor
+    Write-Host ("The vESXi can not be fairly distributed on student datacenters. Total vESXi : {0}" -f $totalVesx) -ForegroundColor $ErrorColor
     return
 }
 $totalDc = $totalVesx / $nbEsxPerDC
@@ -152,6 +151,14 @@ while (!$oReturn) {
         Write-Host "Connection failed ! New connection after 20 seconds..." -ForegroundColor $DefaultColor
         Start-Sleep -Seconds 20
     }
+}
+
+# Check the vESXi information from the configuration file
+try {
+    $networks = Get-VirtualNetwork -Name $vConfig.network
+} catch {
+    Write-Host("Network '{0}' does not exist!" -f $vConfig.network) -ForegroundColor $ErrorColor
+    return
 }
 
 # Add ESXi to the main datacenter
@@ -196,7 +203,14 @@ catch {
 }
 foreach ($e in $esxConfig) {
     try {
-        $ip2obj[$e.ip] = Get-VMHost -Name $e.ip
+        $vmh =  Get-VMHost -Name $e.ip
+        $vmhDc = $vmh | Get-Datacenter
+        if ($vmhDc.Name -eq $datacenter) {
+            $ip2obj[$e.ip] = $vmh
+        } else {
+            Write-Host("Host '{0}' does not belong to the rigth datacenter!. Please remove the host to '{1}'" -f $vmh, $vmhDc) -ForegroundColor $ErrorColor
+            return
+        }
     }
     catch {
         Write-Host ("Add the host {0} to $datacenter" -f $e.ip) -ForegroundColor $DefaultColor
@@ -304,7 +318,7 @@ foreach ($e in $esxConfig) {
         Write-Host ("Creating the virtualized ESXi {0}" -f $nameStr) -ForegroundColor $DefaultColor
         if ($createFromClone) {
             # Create the vESXi from an existing vESXi
-            $vesx = New-VM -VM $cloneSrc -VMHost $ip2obj[$e.ip] -Name $nameStr -DiskStorageFormat Thin
+            $vesx = New-VM -VM $cloneSrc -VMHost $ip2obj[$e.ip] -Name $nameStr -DiskStorageFormat Thin -Network $vConfig.network
         }
         else {
             # Create the vESXi from OVF
