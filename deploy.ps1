@@ -116,6 +116,7 @@ if($alwaysDatastore -and $vSanMode -and !$smallestDatastore) {
     return
 }
 $totalVesx = 0
+
 # Check the vESXi information from the configuration file
 if ($vSanMode) {
     if ($nbEsxPerDC -lt 3) {
@@ -176,14 +177,6 @@ if ($missing.Count -gt 0) {
     }
 }
 
-Write-Host("Looking for the vESXi Network '{0}'" -f $vConfig.network) -ForegroundColor $DefaultColor
-try {
-    $networks = Get-VirtualNetwork -Name $vConfig.network
-} catch {
-    Write-Host("Network '{0}' does not exist!" -f $vConfig.network) -ForegroundColor $ErrorColor
-    return
-}
-
 Write-Host "Retrieve the datacenter $datacenter" -ForegroundColor $DefaultColor
 try {
     $dc = Get-Datacenter -Name $datacenter
@@ -203,6 +196,7 @@ foreach ($e in $esxConfig) {
         $ip2obj[$e.ip] = Add-VMHost -Name $e.ip -Location $datacenter -User $e.user -Password $e.pwd -Force
     }
 }
+
 # Waiting for ESXi connection
 foreach ($e in $esxConfig) {
     $vmh = $ip2obj[$e.ip]
@@ -211,6 +205,15 @@ foreach ($e in $esxConfig) {
         Start-Sleep -Seconds 10
         $vmh = Get-VMHost -Name $vmh.Name
     }
+}
+
+# Check the available networks
+Write-Host("Looking for the vESXi Network '{0}'" -f $vConfig.network) -ForegroundColor $DefaultColor
+try {
+    $networks = Get-VirtualNetwork -Name $vConfig.network
+} catch {
+    Write-Host("Network '{0}' does not exist!" -f $vConfig.network) -ForegroundColor $ErrorColor
+    return
 }
 
 # Delete ESXi VM with issues (i.e., vESXi hosts with a vSanDatastore that does not belong to a vSan cluster)
